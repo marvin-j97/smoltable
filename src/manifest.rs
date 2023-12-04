@@ -1,0 +1,127 @@
+use crate::data_folder;
+use lsm_tree::Tree as LsmTree;
+use serde::{Deserialize, Serialize};
+
+pub struct ManifestTable {
+    data: LsmTree,
+}
+
+impl std::ops::Deref for ManifestTable {
+    type Target = LsmTree;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ColumnFamilyDefinition {
+    pub name: String,
+}
+
+impl ManifestTable {
+    pub fn open() -> lsm_tree::Result<Self> {
+        let manifest_table_path = data_folder().join("manifest");
+        log::info!(
+            "Opening manifest table at {}",
+            manifest_table_path.display()
+        );
+
+        let manifest_table = Self {
+            data: lsm_tree::Config::new(manifest_table_path)
+                .level_count(1)
+                .block_cache_capacity(/* 16 KiB */ 4)
+                .max_memtable_size(/* 1 MiB */ 1_024 * 1_024)
+                .compaction_strategy(lsm_tree::compaction::SizeTiered::new(1, 4))
+                .open()?,
+        };
+
+        #[cfg(debug_assertions)]
+        {
+            eprintln!("= MANIFEST =");
+            for item in &manifest_table.iter()? {
+                let (key, value) = item?;
+                let key = std::str::from_utf8(&key).expect("should be utf-8");
+                let value = std::str::from_utf8(&value).expect("should be utf-8");
+
+                eprintln!("{key} => {value}");
+            }
+        }
+
+        Ok(manifest_table)
+    }
+
+    pub fn get_user_table_names(&self) -> lsm_tree::Result<Vec<String>> {
+        self.data
+            .prefix("t:n:")?
+            .into_iter()
+            .map(|item| {
+                let (_, table_name) = item?;
+                let table_name = String::from_utf8(table_name).expect("table name should be utf-8");
+                Ok(table_name)
+            })
+            .collect()
+    }
+
+    pub fn persist_user_table(&self, table_name: &str) -> lsm_tree::Result<()> {
+        self.data.insert(format!("t:n:{table_name}"), table_name)?;
+        self.data.flush()?;
+        Ok(())
+    }
+
+    pub fn persist_column_family(
+        &self,
+        table_name: &str,
+        column_family_definition: &ColumnFamilyDefinition,
+    ) -> lsm_tree::Result<()> {
+        let str = serde_json::to_string(&column_family_definition).expect("should serialize");
+
+        self.data.insert(
+            format!("t:{table_name}:cf:{}", column_family_definition.name),
+            str,
+        )?;
+        self.data.flush()?;
+
+        Ok(())
+    }
+
+    pub fn get_user_table_column_families(
+        &self,
+        table_name: &str,
+    ) -> lsm_tree::Result<Vec<ColumnFamilyDefinition>> {
+        self.data
+            .prefix(format!("t:{table_name}:cf:"))?
+            .into_iter()
+            .map(|item| {
+                let (_, value) = item?;
+                let value = std::str::from_utf8(&value).expect("column definition should be utf-8");
+                let value = serde_json::from_str::<ColumnFamilyDefinition>(value)
+                    .expect("column definition should be json");
+                Ok(value)
+            })
+            .collect()
+    }
+
+    pub fn column_family_exists(
+        &self,
+        table_name: &str,
+        column_family_name: &str,
+    ) -> lsm_tree::Result<bool> {
+        Ok(self
+            .get_user_table_column_families(table_name)?
+            .iter()
+            .any(|cf| cf.name == column_family_name))
+    }
+
+    pub fn delete_user_table(&self, table_name: &str) -> lsm_tree::Result<()> {
+        let mut batch = self.data.batch();
+
+        batch.remove(format!("t:n:{table_name}"));
+
+        for item in self.get_user_table_column_families(table_name)? {
+            batch.remove(item.name);
+        }
+
+        batch.commit()
+    }
+}
