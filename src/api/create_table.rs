@@ -1,8 +1,8 @@
-use super::format_server_header;
-use crate::app_state::AppState;
 use crate::error::CustomRouteResult;
-use crate::is_valid_identifier;
+use crate::identifier::is_valid_identifier;
+use crate::{app_state::AppState, response::build_response};
 use actix_web::{
+    http::StatusCode,
     put,
     web::{self, Path},
     HttpResponse,
@@ -19,50 +19,31 @@ pub async fn handler(
     let table_name = path.into_inner();
 
     if !is_valid_identifier(&table_name) {
-        let body = json!({
-            "status": 400,
-            "message": "Invalid table name",
-            "result": null
-        });
-
-        let body = serde_json::to_string(&body).expect("should serialize");
-
-        return Ok(HttpResponse::BadRequest()
-            .append_header(("x-server", format_server_header()))
-            .append_header(("x-took-ms", before.elapsed().as_millis().to_string()))
-            .content_type("application/json; utf-8")
-            .body(body));
+        return Ok(build_response(
+            before,
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
     }
 
     let tables = app_state.user_tables.read().expect("lock is poisoned");
     if tables.contains_key(&table_name) {
-        let body = json!({
-            "status": 409,
-            "message": "Conflict",
-            "result": null
-        });
-        let body = serde_json::to_string(&body).expect("should serialize");
-
-        return Ok(HttpResponse::Conflict()
-            .append_header(("x-server", format_server_header()))
-            .append_header(("x-took-ms", before.elapsed().as_millis().to_string()))
-            .content_type("application/json; utf-8")
-            .body(body));
+        return Ok(build_response(
+            before,
+            StatusCode::CONFLICT,
+            "Conflict",
+            &json!(null),
+        ));
     }
     drop(tables);
 
     app_state.create_table(&table_name)?;
 
-    let body = json!({
-        "status": 201,
-        "message": "Table created successfully",
-        "result": null
-    });
-    let body = serde_json::to_string(&body).expect("should serialize");
-
-    Ok(HttpResponse::Created()
-        .append_header(("x-server", format_server_header()))
-        .append_header(("x-took-ms", before.elapsed().as_millis().to_string()))
-        .content_type("application/json; utf-8")
-        .body(body))
+    Ok(build_response(
+        before,
+        StatusCode::CREATED,
+        "Table created successfully",
+        &json!(null),
+    ))
 }

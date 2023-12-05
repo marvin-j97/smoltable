@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::data_folder;
 use lsm_tree::Tree as LsmTree;
 use serde::{Deserialize, Serialize};
@@ -29,10 +31,14 @@ impl ManifestTable {
 
         let manifest_table = Self {
             data: lsm_tree::Config::new(manifest_table_path)
-                .level_count(1)
+                .level_count(2)
                 .block_cache_capacity(/* 16 KiB */ 4)
-                .max_memtable_size(/* 1 MiB */ 1_024 * 1_024)
-                .compaction_strategy(lsm_tree::compaction::SizeTiered::new(1, 4))
+                .max_memtable_size(/* 512 KiB */ 512 * 1_024)
+                .compaction_strategy(Arc::new(lsm_tree::compaction::Levelled {
+                    l0_threshold: 1,
+                    ratio: 2,
+                    target_size: 512 * 1_024,
+                }))
                 .open()?,
         };
 
@@ -48,12 +54,14 @@ impl ManifestTable {
             }
         }
 
+        log::info!("Recovered manifest table");
+
         Ok(manifest_table)
     }
 
     pub fn get_user_table_names(&self) -> lsm_tree::Result<Vec<String>> {
         self.data
-            .prefix("t:n:")?
+            .prefix("n:")?
             .into_iter()
             .map(|item| {
                 let (_, table_name) = item?;
@@ -64,7 +72,7 @@ impl ManifestTable {
     }
 
     pub fn persist_user_table(&self, table_name: &str) -> lsm_tree::Result<()> {
-        self.data.insert(format!("t:n:{table_name}"), table_name)?;
+        self.data.insert(format!("n:{table_name}"), table_name)?;
         self.data.flush()?;
         Ok(())
     }
@@ -116,7 +124,7 @@ impl ManifestTable {
     pub fn delete_user_table(&self, table_name: &str) -> lsm_tree::Result<()> {
         let mut batch = self.data.batch();
 
-        batch.remove(format!("t:n:{table_name}"));
+        batch.remove(format!("n:{table_name}"));
 
         for item in self.get_user_table_column_families(table_name)? {
             batch.remove(item.name);

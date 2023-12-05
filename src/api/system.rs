@@ -1,6 +1,5 @@
-use super::format_server_header;
-use crate::error::CustomRouteResult;
-use actix_web::{get, HttpResponse};
+use crate::{error::CustomRouteResult, response::build_response};
+use actix_web::{get, http::StatusCode, HttpResponse};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::Path;
@@ -44,21 +43,15 @@ pub async fn handler() -> CustomRouteResult<HttpResponse> {
         database_size_in_bytes: data_folder_size,
     };
 
-    let body = json!({
-        "status": 200,
-        "message": "System info retrieved successfully",
-        "result": {
+    Ok(build_response(
+        before,
+        StatusCode::OK,
+        "System info retrieved successfully",
+        &json!({
             "system": {
               "info": info,
               "stats": stats
             }
-        }
-    });
-    let body = serde_json::to_string(&body).expect("should serialize");
-
-    Ok(HttpResponse::Ok()
-        .append_header(("x-server", format_server_header()))
-        .append_header(("x-took-ms", before.elapsed().as_millis().to_string()))
-        .content_type("application/json; utf-8")
-        .body(body))
+        }),
+    ))
 }

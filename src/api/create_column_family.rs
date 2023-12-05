@@ -1,7 +1,8 @@
-use super::format_server_header;
 use crate::error::CustomRouteResult;
-use crate::is_valid_identifier;
+use crate::identifier::is_valid_identifier;
+use crate::response::build_response;
 use crate::{app_state::AppState, manifest::ColumnFamilyDefinition};
+use actix_web::http::StatusCode;
 use actix_web::{
     post,
     web::{self, Path},
@@ -20,53 +21,34 @@ pub async fn handler(
     let (table_name, cf_name) = path.into_inner();
 
     if !is_valid_identifier(&cf_name) {
-        let body = json!({
-            "status": 400,
-            "message": "Invalid column family name",
-            "result": null
-        });
-
-        let body = serde_json::to_string(&body).expect("should serialize");
-
-        return Ok(HttpResponse::BadRequest()
-            .append_header(("x-server", format_server_header()))
-            .append_header(("x-took-ms", before.elapsed().as_millis().to_string()))
-            .content_type("application/json; utf-8")
-            .body(body));
+        return Ok(build_response(
+            before,
+            StatusCode::BAD_REQUEST,
+            "Invalid column family name",
+            &json!(null),
+        ));
     }
 
     if app_state
         .manifest_table
         .column_family_exists(&table_name, &cf_name)?
     {
-        let body = json!({
-            "status": 409,
-            "message": "Conflict",
-            "result": null
-        });
-        let body = serde_json::to_string(&body).expect("should serialize");
-
-        return Ok(HttpResponse::Conflict()
-            .append_header(("x-server", format_server_header()))
-            .append_header(("x-took-ms", before.elapsed().as_millis().to_string()))
-            .content_type("application/json; utf-8")
-            .body(body));
+        return Ok(build_response(
+            before,
+            StatusCode::CONFLICT,
+            "Conflict",
+            &json!(null),
+        ));
     }
 
     app_state
         .manifest_table
         .persist_column_family(&table_name, &ColumnFamilyDefinition { name: cf_name })?;
 
-    let body = json!({
-        "status": 201,
-        "message": "Column family created successfully",
-        "result": null
-    });
-    let body = serde_json::to_string(&body).expect("should serialize");
-
-    Ok(HttpResponse::Created()
-        .append_header(("x-server", format_server_header()))
-        .append_header(("x-took-ms", before.elapsed().as_millis().to_string()))
-        .content_type("application/json; utf-8")
-        .body(body))
+    Ok(build_response(
+        before,
+        StatusCode::CREATED,
+        "Column family created successfully",
+        &json!(null),
+    ))
 }

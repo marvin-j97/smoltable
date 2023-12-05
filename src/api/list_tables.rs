@@ -1,6 +1,7 @@
-use super::format_server_header;
 use crate::error::CustomRouteResult;
+use crate::response::build_response;
 use crate::{app_state::AppState, manifest::ColumnFamilyDefinition};
+use actix_web::http::StatusCode;
 use actix_web::{get, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -42,21 +43,15 @@ pub async fn handler(app_state: web::Data<AppState>) -> CustomRouteResult<HttpRe
         })
         .collect::<lsm_tree::Result<Vec<_>>>()?;
 
-    let body = json!({
-        "status": 200,
-        "message": "Tables retrieved successfully",
-        "result": {
+    Ok(build_response(
+        before,
+        StatusCode::OK,
+        "Tables retrieved successfully",
+        &json!({
             "tables": {
                 "count": tables.len(),
                 "items": tables
             }
-        }
-    });
-    let body = serde_json::to_string(&body).expect("should serialize");
-
-    Ok(HttpResponse::Ok()
-        .append_header(("x-server", format_server_header()))
-        .append_header(("x-took-ms", before.elapsed().as_millis().to_string()))
-        .content_type("application/json; utf-8")
-        .body(body))
+        }),
+    ))
 }
