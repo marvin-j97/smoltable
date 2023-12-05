@@ -127,7 +127,8 @@ impl SmolTable {
     pub fn query(&self, input: &QueryInput) -> lsm_tree::Result<QueryOutput> {
         let key = input.row_key.as_bytes();
 
-        let iter = self.tree.prefix(key)?;
+        let snapshot = self.tree.snapshot();
+        let iter = snapshot.prefix(key)?;
 
         let mut iter = iter.into_iter().map(|item| {
             let (key, value) = item?;

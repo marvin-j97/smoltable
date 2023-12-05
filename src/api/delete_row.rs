@@ -1,4 +1,5 @@
 use crate::app_state::AppState;
+use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
@@ -24,6 +25,7 @@ fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
 #[derive(Debug, Deserialize)]
 pub struct Input {
     row_key: String,
+    column_filter: Option<ColumnKey>,
 }
 
 #[delete("/table/{name}/row")]
@@ -43,7 +45,19 @@ pub async fn handler(
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let count = table.delete_row(&req_body.row_key)?;
+        let mut key = format!("{}:", req_body.row_key);
+
+        if let Some(column_filter) = &req_body.column_filter {
+            let cf = &column_filter.family;
+
+            key.push_str(&format!("cf:{cf}"));
+
+            if let Some(cq) = &column_filter.qualifier {
+                key.push_str(&format!(":c:{cq}"));
+            }
+        }
+
+        let count = table.delete_row(&key)?;
 
         let micros_per_item = if count == 0 {
             None

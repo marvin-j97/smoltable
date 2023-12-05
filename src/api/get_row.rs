@@ -38,22 +38,24 @@ pub async fn handler(
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let rows = table.query(&req_body)?;
-
         let mut key = format!("{}:", req_body.row_key);
 
         if let Some(column_filter) = &req_body.column_filter {
             let cf = &column_filter.family;
 
-            key.push_str(&format!("cf:{cf}:"));
+            key.push_str(&format!("cf:{cf}"));
 
             if let Some(cq) = &column_filter.qualifier {
-                key.push_str(&format!("c:{cq}"));
+                key.push_str(&format!(":c:{cq}"));
             }
         }
 
-        // NOTE: Don't do filtering, we already built the query key correctly
-        req_body.column_filter = None;
+        let rows = table.query(&QueryInput {
+            row_key: key,
+            column_filter: None,
+            limit: req_body.limit,
+            cell_limit: req_body.cell_limit,
+        })?;
 
         Ok(build_response(
             before,

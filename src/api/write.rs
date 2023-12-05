@@ -80,7 +80,8 @@ pub async fn handler(
             &json!({
                 "micros_per_item": micros_per_item,
                 "items": {
-                    "count": req_body.items.len(),
+                    "row_count": req_body.items.len(),
+                    "cell_count": cell_count
                 }
             }),
         ))
