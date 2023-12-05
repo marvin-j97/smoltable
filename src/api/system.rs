@@ -49,8 +49,8 @@ pub async fn handler() -> CustomRouteResult<HttpResponse> {
         "System info retrieved successfully",
         &json!({
             "system": {
-              "info": info,
-              "stats": stats
+                "info": info,
+                "stats": stats
             }
         }),
     ))
