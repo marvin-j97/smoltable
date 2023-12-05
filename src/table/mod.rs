@@ -4,7 +4,7 @@ use crate::column_key::ColumnKey;
 use base64::{engine::general_purpose, Engine as _};
 use lsm_tree::{Batch, Tree as LsmTree};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{collections::HashMap, ops::Bound, path::Path, sync::Arc};
 
 const MEMTABLE_SIZE: u32 = /* 32 MiB */ 32 * 1024 * 1024;
 
@@ -79,38 +79,80 @@ impl SmolTable {
         Ok(Self { tree })
     }
 
+    pub fn delete_row(&self, key: &str) -> lsm_tree::Result<u64> {
+        use std::ops::Bound::{Excluded, Included, Unbounded};
+
+        let prefix_key = format!("{}:", key);
+        let mut count = 0;
+
+        let Some(first_item) = self
+            .tree
+            .prefix(prefix_key.clone())?
+            .into_iter()
+            .next()
+            .transpose()?
+        else {
+            return Ok(count);
+        };
+
+        let mut range: (Bound<Vec<u8>>, Bound<Vec<u8>>) =
+            (Included(first_item.0.clone()), Unbounded);
+
+        loop {
+            let chunk = self
+                .tree
+                .range(range.clone())?
+                .into_iter()
+                .take(1_000)
+                .collect::<lsm_tree::Result<Vec<_>>>()?;
+
+            if chunk.is_empty() {
+                return Ok(count);
+            }
+
+            for (key, _) in &chunk {
+                if !key.starts_with(prefix_key.as_bytes()) {
+                    return Ok(count);
+                }
+
+                self.tree.remove(key.clone())?;
+                count += 1;
+            }
+
+            let (key, _) = chunk.last().unwrap();
+            range = (Excluded(key.clone()), Unbounded);
+        }
+    }
+
     pub fn query(&self, input: &QueryInput) -> lsm_tree::Result<QueryOutput> {
-        let key = input.row_key.clone();
+        let key = input.row_key.as_bytes();
 
         let iter = self.tree.prefix(key)?;
 
-        let mut iter = iter
-            .into_iter()
-            .map(|item| {
-                let (key, value) = item?;
+        let mut iter = iter.into_iter().map(|item| {
+            let (key, value) = item?;
 
-                let parsed_key = key.splitn(7, |&e| e == b':');
+            let parsed_key = key.splitn(7, |&e| e == b':');
 
-                let chunks = parsed_key.collect::<Vec<_>>();
-                let row_key = std::str::from_utf8(chunks[0]).unwrap();
-                let cf = std::str::from_utf8(chunks[2]).unwrap();
-                let cq = std::str::from_utf8(chunks[4]).unwrap();
+            let chunks = parsed_key.collect::<Vec<_>>();
+            let row_key = std::str::from_utf8(chunks[0]).unwrap();
+            let cf = std::str::from_utf8(chunks[2]).unwrap();
+            let cq = std::str::from_utf8(chunks[4]).unwrap();
 
-                let mut buf = [0; std::mem::size_of::<u128>()];
-                buf.clone_from_slice(&chunks[5][..std::mem::size_of::<u128>()]);
-                let ts = !u128::from_be_bytes(buf);
+            let mut buf = [0; std::mem::size_of::<u128>()];
+            buf.clone_from_slice(&chunks[5][..std::mem::size_of::<u128>()]);
+            let ts = !u128::from_be_bytes(buf);
 
-                Ok::<_, lsm_tree::Error>(VisitedCell {
-                    row_key: row_key.into(),
-                    timestamp: ts,
-                    column_key: ColumnKey {
-                        family: cf.to_owned(),
-                        qualifier: Some(cq.to_owned()),
-                    },
-                    value: general_purpose::STANDARD.encode(value),
-                })
+            Ok::<_, lsm_tree::Error>(VisitedCell {
+                row_key: row_key.into(),
+                timestamp: ts,
+                column_key: ColumnKey {
+                    family: cf.to_owned(),
+                    qualifier: Some(cq.to_owned()),
+                },
+                value: general_purpose::STANDARD.encode(value),
             })
-            .take(input.limit.unwrap_or(1_000).into());
+        });
 
         let mut rows = vec![];
 
@@ -136,6 +178,10 @@ impl SmolTable {
         };
 
         for item in iter {
+            if rows.len() >= input.limit.unwrap_or(u16::MAX) as usize {
+                break;
+            }
+
             let cell = item?;
 
             if let Some(col_filter) = &input.column_filter {

@@ -90,6 +90,7 @@ async fn main() -> lsm_tree::Result<()> {
             .service(api::create_table::handler)
             .service(api::write::handler)
             .service(api::get_row::handler)
+            .service(api::delete_row::handler)
             .service(api::prefix::handler)
             .service(api::create_column_family::handler)
             .service(actix_files::Files::new("/", "./dist").index_file("index.html"))

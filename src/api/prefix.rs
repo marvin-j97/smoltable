@@ -29,7 +29,7 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.write().expect("lock is poisoned");
+    let tables = app_state.user_tables.read().expect("lock is poisoned");
 
     let table_name = path.into_inner();
 
@@ -51,10 +51,8 @@ pub async fn handler(
             StatusCode::OK,
             "Query successful",
             &json!({
-                "result": {
-                    "micros_per_item": micros_per_item,
-                    "rows": rows
-                }
+                "micros_per_item": micros_per_item,
+                "rows": rows
             }),
         ))
     } else {

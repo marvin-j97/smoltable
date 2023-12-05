@@ -8,13 +8,19 @@ use actix_web::{
     web::{self, Path},
     HttpResponse,
 };
+use serde::Deserialize;
 use serde_json::json;
 
-// TODO: TTL options etc JSON body
+#[derive(Debug, Deserialize)]
+pub struct Input {
+    row_limit: Option<u64>,
+}
+
 #[post("/table/{name}/column-family/{cf_name}")]
 pub async fn handler(
     path: Path<(String, String)>,
     app_state: web::Data<AppState>,
+    req_body: web::Json<Input>,
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
@@ -41,9 +47,16 @@ pub async fn handler(
         ));
     }
 
-    app_state
-        .manifest_table
-        .persist_column_family(&table_name, &ColumnFamilyDefinition { name: cf_name })?;
+    app_state.manifest_table.persist_column_family(
+        &table_name,
+        &ColumnFamilyDefinition {
+            name: cf_name,
+            row_limit: req_body.row_limit,
+        },
+    )?;
+
+    // TODO: spawn GC thread... spawn on recover as well
+    // stop on delete table
 
     Ok(build_response(
         before,

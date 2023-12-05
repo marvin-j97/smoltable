@@ -34,7 +34,7 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.write().expect("lock is poisoned");
+    let tables = app_state.user_tables.read().expect("lock is poisoned");
 
     let table_name = path.into_inner();
 
@@ -45,6 +45,8 @@ pub async fn handler(
     if let Some(table) = tables.get(&table_name) {
         let mut writer =
             TableWriter::new(app_state.manifest_table.clone(), table.clone(), table_name);
+
+        drop(tables);
 
         for row in &req_body.items {
             if let Err(write_error) = writer.write(row) {
