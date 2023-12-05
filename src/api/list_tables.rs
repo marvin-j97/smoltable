@@ -34,7 +34,7 @@ pub async fn handler(app_state: web::Data<AppState>) -> CustomRouteResult<HttpRe
                 column_families: app_state
                     .manifest_table
                     .get_user_table_column_families(table_name)?,
-                disk_space_in_bytes: table.disk_space_usage(),
+                disk_space_in_bytes: table.disk_space_usage()?,
                 cache_stats: CacheStats {
                     block_count: table.cached_block_count(),
                     memory_usage_in_bytes: table.cache_memory_usage(),

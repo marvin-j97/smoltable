@@ -186,7 +186,7 @@ impl SmolTable {
         self.tree.batch()
     }
 
-    pub fn disk_space_usage(&self) -> u64 {
+    pub fn disk_space_usage(&self) -> lsm_tree::Result<u64> {
         self.tree.disk_space()
     }
 
