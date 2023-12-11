@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
 use crate::data_folder;
 use lsm_tree::Tree as LsmTree;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 pub struct ManifestTable {
     data: LsmTree,
@@ -23,17 +22,17 @@ pub struct ColumnFamilyDefinition {
 }
 
 impl ManifestTable {
-    pub fn open() -> lsm_tree::Result<Self> {
+    pub fn open(block_cache: Arc<lsm_tree::BlockCache>) -> lsm_tree::Result<Self> {
         let manifest_table_path = data_folder().join("manifest");
         log::info!(
             "Opening manifest table at {}",
             manifest_table_path.display()
         );
 
-        let manifest_table = Self {
+        let tree = Self {
             data: lsm_tree::Config::new(manifest_table_path)
                 .level_count(2)
-                .block_cache_capacity(/* 16 KiB */ 4)
+                .block_cache(block_cache)
                 .max_memtable_size(/* 512 KiB */ 512 * 1_024)
                 .compaction_strategy(Arc::new(lsm_tree::compaction::Levelled {
                     l0_threshold: 1,
@@ -46,7 +45,7 @@ impl ManifestTable {
         #[cfg(debug_assertions)]
         {
             eprintln!("= MANIFEST =");
-            for item in &manifest_table.iter()? {
+            for item in &tree.iter()? {
                 let (key, value) = item?;
                 let key = std::str::from_utf8(&key).expect("should be utf-8");
                 let value = std::str::from_utf8(&value).expect("should be utf-8");
@@ -57,7 +56,7 @@ impl ManifestTable {
 
         log::info!("Recovered manifest table");
 
-        Ok(manifest_table)
+        Ok(tree)
     }
 
     pub fn get_user_table_names(&self) -> lsm_tree::Result<Vec<String>> {
@@ -66,7 +65,8 @@ impl ManifestTable {
             .into_iter()
             .map(|item| {
                 let (_, table_name) = item?;
-                let table_name = String::from_utf8(table_name).expect("table name should be utf-8");
+                let table_name =
+                    String::from_utf8(table_name.to_vec()).expect("table name should be utf-8");
                 Ok(table_name)
             })
             .collect()

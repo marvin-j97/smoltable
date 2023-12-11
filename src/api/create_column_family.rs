@@ -4,7 +4,7 @@ use crate::response::build_response;
 use crate::{app_state::AppState, manifest::ColumnFamilyDefinition};
 use actix_web::http::StatusCode;
 use actix_web::{
-    post,
+    put,
     web::{self, Path},
     HttpResponse,
 };
@@ -16,7 +16,7 @@ pub struct Input {
     row_limit: Option<u64>,
 }
 
-#[post("/table/{name}/column-family/{cf_name}")]
+#[put("/table/{name}/column-family/{cf_name}")]
 pub async fn handler(
     path: Path<(String, String)>,
     app_state: web::Data<AppState>,

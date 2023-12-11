@@ -2,7 +2,7 @@ pub mod writer;
 
 use crate::column_key::ColumnKey;
 use base64::{engine::general_purpose, Engine as _};
-use lsm_tree::{Batch, Tree as LsmTree};
+use lsm_tree::{Batch, BlockCache, Tree as LsmTree};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Bound, path::Path, sync::Arc};
 
@@ -10,14 +10,14 @@ const MEMTABLE_SIZE: u32 = /* 32 MiB */ 32 * 1024 * 1024;
 
 #[derive(Clone)]
 pub struct SmolTable {
-    tree: LsmTree,
+    pub tree: LsmTree,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct QueryInput {
     pub row_key: String,
     pub column_filter: Option<ColumnKey>,
-    pub limit: Option<u16>,
+    pub limit: Option<u16>, // TODO: rename row_limit
     pub cell_limit: Option<u16>,
 }
 
@@ -45,7 +45,10 @@ pub struct VisitedCell {
 }
 
 impl SmolTable {
-    pub fn new<P: AsRef<Path>>(path: P) -> lsm_tree::Result<SmolTable> {
+    pub fn new<P: AsRef<Path>>(
+        path: P,
+        block_cache: Arc<BlockCache>,
+    ) -> lsm_tree::Result<SmolTable> {
         let path = path.as_ref();
 
         let tree = lsm_tree::Config::new(path)
@@ -56,26 +59,13 @@ impl SmolTable {
                 l0_threshold: 2,
                 ratio: 4,
             }))
-            .block_cache_capacity(/* 50 MiB*/ 12_800)
+            .block_cache(block_cache)
             .open()?;
 
-        Self::from_tree(path, tree)
+        Self::from_tree(tree)
     }
 
-    pub fn from_tree<P: AsRef<Path>>(path: P, tree: LsmTree) -> lsm_tree::Result<SmolTable> {
-        let path = path.as_ref();
-
-        #[cfg(debug_assertions)]
-        {
-            eprintln!("= USER TABLE {} =", path.display());
-            for item in &tree.iter()? {
-                let (key, value) = item?;
-                let key = String::from_utf8_lossy(&key);
-
-                eprintln!("{key} => {value:?}");
-            }
-        }
-
+    pub fn from_tree(tree: LsmTree) -> lsm_tree::Result<SmolTable> {
         Ok(Self { tree })
     }
 
@@ -96,7 +86,7 @@ impl SmolTable {
         };
 
         let mut range: (Bound<Vec<u8>>, Bound<Vec<u8>>) =
-            (Included(first_item.0.clone()), Unbounded);
+            (Included(first_item.0.to_vec()), Unbounded);
 
         loop {
             let chunk = self
@@ -107,12 +97,12 @@ impl SmolTable {
                 .collect::<lsm_tree::Result<Vec<_>>>()?;
 
             if chunk.is_empty() {
-                return Ok(count);
+                break;
             }
 
             for (key, _) in &chunk {
                 if !key.starts_with(prefix_key.as_bytes()) {
-                    return Ok(count);
+                    break;
                 }
 
                 self.tree.remove(key.clone())?;
@@ -120,8 +110,11 @@ impl SmolTable {
             }
 
             let (key, _) = chunk.last().unwrap();
-            range = (Excluded(key.clone()), Unbounded);
+            range = (Excluded(key.to_vec()), Unbounded);
         }
+
+        self.tree.flush()?;
+        Ok(count)
     }
 
     pub fn query(&self, input: &QueryInput) -> lsm_tree::Result<QueryOutput> {
@@ -136,9 +129,10 @@ impl SmolTable {
             let parsed_key = key.splitn(7, |&e| e == b':');
 
             let chunks = parsed_key.collect::<Vec<_>>();
+
             let row_key = std::str::from_utf8(chunks[0]).unwrap();
             let cf = std::str::from_utf8(chunks[2]).unwrap();
-            let cq = std::str::from_utf8(chunks[4]).unwrap();
+            let cq = std::str::from_utf8(chunks[4]).ok().map(Into::into);
 
             let mut buf = [0; std::mem::size_of::<u128>()];
             buf.clone_from_slice(&chunks[5][..std::mem::size_of::<u128>()]);
@@ -149,7 +143,7 @@ impl SmolTable {
                 timestamp: ts,
                 column_key: ColumnKey {
                     family: cf.to_owned(),
-                    qualifier: Some(cq.to_owned()),
+                    qualifier: cq,
                 },
                 value: general_purpose::STANDARD.encode(value),
             })

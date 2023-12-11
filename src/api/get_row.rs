@@ -25,7 +25,7 @@ fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
-    mut req_body: web::Json<QueryInput>,
+    req_body: web::Json<QueryInput>,
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
