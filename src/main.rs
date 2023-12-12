@@ -1,6 +1,7 @@
 mod api;
 mod app_state;
 mod column_key;
+mod env;
 mod error;
 mod identifier;
 mod manifest;
@@ -8,6 +9,7 @@ mod metrics;
 mod response;
 mod table;
 
+use crate::env::{data_folder, get_port};
 use actix_web::{
     http::header::ContentType, middleware::Logger, web, App, HttpResponse, HttpServer,
 };
@@ -19,7 +21,6 @@ use manifest::ManifestTable;
 use metrics::MetricsTable;
 use std::{
     collections::HashMap,
-    path::PathBuf,
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -35,11 +36,6 @@ use jemallocator::Jemalloc;
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc; */
-
-pub fn data_folder() -> PathBuf {
-    let data_folder = std::env::var("SMOLTABLE_DATA").unwrap_or(".smoltable_data".into());
-    PathBuf::from(&data_folder)
-}
 
 fn recover_user_tables(
     manifest_table: &ManifestTable,
@@ -61,14 +57,6 @@ fn recover_user_tables(
     log::info!("Recovered {} user tables", user_tables.len());
 
     Ok(user_tables)
-}
-
-fn get_port() -> u16 {
-    let port = std::env::var("PORT")
-        .or_else(|_| std::env::var("SMOLTABLE_PORT"))
-        .unwrap_or("9876".into());
-
-    port.parse::<u16>().expect("invalid port")
 }
 
 const INDEX_HTML: &str = include_str!("../dist/index.html");
