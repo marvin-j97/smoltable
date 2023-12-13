@@ -18,13 +18,14 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.read().await;
+    let mut tables = app_state.user_tables.write().await;
 
     let table_name = path.into_inner();
 
     if tables.get(&table_name).is_some() {
         app_state.manifest_table.delete_user_table(&table_name)?;
-        remove_dir_all(data_folder().join("user_tables").join(table_name))?;
+        remove_dir_all(data_folder().join("user_tables").join(&table_name))?;
+        tables.remove(&table_name);
 
         let micros = before.elapsed().as_micros();
 

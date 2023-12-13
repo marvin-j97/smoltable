@@ -130,7 +130,7 @@ impl ManifestTable {
         batch.remove(format!("n:{table_name}"));
 
         for item in self.get_user_table_column_families(table_name)? {
-            batch.remove(item.name);
+            batch.remove(format!("t:{table_name}:cf:{}", item.name));
         }
 
         batch.commit()?;

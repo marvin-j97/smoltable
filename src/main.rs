@@ -55,8 +55,6 @@ fn recover_user_tables(
     Ok(user_tables)
 }
 
-const INDEX_HTML: &str = include_str!("../dist/index.html");
-
 async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse> {
     // Render metrics into html
     let system_metrics = data.metrics_table.query_timeseries("sys", None)?;
@@ -65,7 +63,14 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
         Some(ColumnKey::try_from("stats:").expect("should be valid column key")),
     )?;
 
-    let html = INDEX_HTML
+    let html = if cfg!(debug_assertions) {
+        // NOTE: Enable hot reload in debug mode
+        std::fs::read_to_string("dist/index.html")?
+    } else {
+        include_str!("../dist/index.html").to_owned()
+    };
+
+    let html = html
         .replace(
             "{{system_metrics}}",
             &serde_json::to_string(&system_metrics.get(0).unwrap()).expect("should serialize"),
