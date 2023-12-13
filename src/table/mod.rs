@@ -133,8 +133,6 @@ impl Smoltable {
     }
 
     pub fn query(&self, input: &QueryInput) -> lsm_tree::Result<QueryOutput> {
-        dbg!("query", input);
-
         let key = input.row_key.as_bytes();
 
         let snapshot = self.tree.snapshot();

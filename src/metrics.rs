@@ -22,7 +22,7 @@ impl MetricsTable {
         log::info!("Opening metrics table at {}", metrics_table_path.display());
 
         let tree = lsm_tree::Config::new(metrics_table_path.clone())
-            .level_count(1)
+            .level_count(2)
             .block_cache(block_cache)
             .max_memtable_size(/* 1 MiB */ 1_024 * 1_024)
             .compaction_strategy(lsm_tree::compaction::Fifo::new(
