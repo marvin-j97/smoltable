@@ -1,7 +1,9 @@
 use crate::app_state::AppState;
+use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
 use crate::response::build_response;
-use crate::table::writer::{RowWriteItem, WriteError, Writer as TableWriter};
+use crate::table::writer::{ColumnWriteItem, RowWriteItem, WriteError, Writer as TableWriter};
+use crate::table::CellValue;
 use actix_web::http::StatusCode;
 use actix_web::{
     post,
@@ -26,7 +28,7 @@ fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
     ))
 }
 
-#[post("/table/{name}/write")]
+#[post("/v1/table/{name}/write")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
@@ -34,7 +36,7 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.read().expect("lock is poisoned");
+    let tables = app_state.user_tables.read().await;
 
     let table_name = path.into_inner();
 
@@ -44,7 +46,7 @@ pub async fn handler(
 
     if let Some(table) = tables.get(&table_name) {
         let mut writer =
-            TableWriter::new(app_state.manifest_table.clone(), table.clone(), table_name);
+            TableWriter::new(app_state.manifest_table.clone(), table.clone(), &table_name);
 
         drop(tables);
 
@@ -67,11 +69,26 @@ pub async fn handler(
             .map(|row| row.cells.len() as u128)
             .sum::<u128>();
 
+        let micros_total = before.elapsed().as_micros();
+
         let micros_per_item = if cell_count == 0 {
             None
         } else {
-            Some(before.elapsed().as_micros() / cell_count)
+            Some(micros_total / cell_count)
         };
+
+        TableWriter::write_raw(
+            &app_state.metrics_table.0,
+            &RowWriteItem {
+                row_key: format!("t#{table_name}"),
+                cells: vec![ColumnWriteItem {
+                    column_key: ColumnKey::try_from("lat:w").expect("should be column key"),
+                    timestamp: None,
+                    value: CellValue::U128(micros_total),
+                }],
+            },
+        )
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "IO error"))?;
 
         Ok(build_response(
             before,

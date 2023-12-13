@@ -20,11 +20,11 @@ struct TableListEntry {
     cache_stats: CacheStats,
 }
 
-#[get("/table")]
+#[get("/v1/table")]
 pub async fn handler(app_state: web::Data<AppState>) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.read().expect("lock is poisoned");
+    let tables = app_state.user_tables.read().await;
 
     let tables = tables
         .iter()

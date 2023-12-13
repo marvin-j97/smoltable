@@ -1,8 +1,10 @@
 use crate::app_state::AppState;
+use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
-use crate::table::QueryInput;
+use crate::table::writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter};
+use crate::table::{CellValue, QueryInput};
 use actix_web::http::StatusCode;
 use actix_web::{
     post,
@@ -21,7 +23,7 @@ fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
     ))
 }
 
-#[post("/table/{name}/prefix")]
+#[post("/v1/table/{name}/prefix")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
@@ -29,7 +31,7 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.read().expect("lock is poisoned");
+    let tables = app_state.user_tables.read().await;
 
     let table_name = path.into_inner();
 
@@ -38,21 +40,39 @@ pub async fn handler(
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let rows = table.query(&req_body)?;
+        let result = table.query(&req_body)?;
 
-        let micros_per_item = if rows.0.is_empty() {
+        let micros_total = before.elapsed().as_micros();
+
+        let micros_per_row = if result.rows.is_empty() {
             None
         } else {
-            Some(before.elapsed().as_micros() / rows.0.len() as u128)
+            Some(micros_total / result.rows.len() as u128)
         };
+
+        TableWriter::write_raw(
+            &app_state.metrics_table.0,
+            &RowWriteItem {
+                row_key: format!("t#{table_name}"),
+                cells: vec![ColumnWriteItem {
+                    column_key: ColumnKey::try_from("lat:r#pfx").expect("should be column key"),
+                    timestamp: None,
+                    value: CellValue::U128(micros_total),
+                }],
+            },
+        )
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "IO error"))?;
 
         Ok(build_response(
             before,
             StatusCode::OK,
             "Query successful",
             &json!({
-                "micros_per_item": micros_per_item,
-                "rows": rows
+                "micros_per_row": micros_total,
+                "micros_per_row": micros_per_row,
+                "rows_scanned": result.rows_scanned_count,
+                "cells_scanned": result.cells_scanned_count,
+                "rows": result.rows
             }),
         ))
     } else {

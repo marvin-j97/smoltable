@@ -1,16 +1,12 @@
 use crate::{
     column_key::ColumnKey,
     data_folder,
-    table::{
-        writer::{ColumnWriteItem, RowWriteItem, WriteError, Writer as TableWriter},
-        QueryInput, Row, SmolTable,
-    },
+    table::{QueryInput, Row, Smoltable},
 };
-use base64::{engine::general_purpose, Engine as _};
 use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct MetricsTable(pub SmolTable);
+pub struct MetricsTable(pub Smoltable);
 
 impl MetricsTable {
     pub fn new(block_cache: Arc<lsm_tree::BlockCache>) -> lsm_tree::Result<Self> {
@@ -18,45 +14,34 @@ impl MetricsTable {
         log::info!("Opening metrics table at {}", metrics_table_path.display());
 
         let tree = lsm_tree::Config::new(metrics_table_path.clone())
-            .level_count(2)
+            .level_count(1)
             .block_cache(block_cache)
-            .max_memtable_size(/* 512 KiB */ 512 * 1_024)
+            .max_memtable_size(/* 1 MiB */ 1_024 * 1_024)
             .compaction_strategy(lsm_tree::compaction::Fifo::new(
-                /* 10 MiB */ 10 * 1_024 * 1_024,
+                /* 100 MiB */ 100 * 1_024 * 1_024,
             ))
+            .flush_threads(1)
             .open()?;
 
         log::info!("Recovered metrics table");
 
-        Ok(Self(SmolTable::from_tree(tree)?))
+        Ok(Self(Smoltable::from_tree(tree)?))
     }
 
-    pub fn push_value(&self, name: &str, value: f64) -> Result<(), WriteError> {
-        TableWriter::write_raw(
-            &self.0,
-            &RowWriteItem {
-                row_key: name.into(),
-                cells: vec![ColumnWriteItem {
-                    column_key: ColumnKey::try_from("v:").expect("should be column key"),
-                    timestamp: None,
-                    value: general_purpose::STANDARD.encode(value.to_string()),
-                }],
-            },
-        )?;
-
-        Ok(())
-    }
-
-    pub fn query_timeseries(&self, name: &str) -> lsm_tree::Result<Vec<Row>> {
+    pub fn query_timeseries(
+        &self,
+        name: &str,
+        column_filter: Option<ColumnKey>,
+    ) -> lsm_tree::Result<Vec<Row>> {
         let data = self
             .0
             .query(&QueryInput {
                 row_key: name.to_owned(),
-                cell_limit: Some(/* 12 hours*/ 1_440 / 2),
-                column_filter: None,
-                limit: None,
+                cell_limit: Some(/* 12 hours*/ 1_440 / 2), // TODO: use timestamp gt filter instead of cell_limit
+                column_filter,
+                row_limit: None,
             })?
-            .0;
+            .rows;
 
         Ok(data)
     }

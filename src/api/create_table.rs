@@ -9,7 +9,7 @@ use actix_web::{
 };
 use serde_json::json;
 
-#[put("/table/{name}")]
+#[put("/v1/table/{name}")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
@@ -27,7 +27,7 @@ pub async fn handler(
         ));
     }
 
-    let tables = app_state.user_tables.read().expect("lock is poisoned");
+    let tables = app_state.user_tables.read().await;
     if tables.contains_key(&table_name) {
         return Ok(build_response(
             before,
@@ -38,7 +38,7 @@ pub async fn handler(
     }
     drop(tables);
 
-    app_state.create_table(&table_name)?;
+    app_state.create_table(&table_name).await?;
 
     Ok(build_response(
         before,

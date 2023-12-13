@@ -1,15 +1,14 @@
 use crate::app_state::AppState;
-use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
+use crate::table::QueryInput;
 use actix_web::http::StatusCode;
 use actix_web::{
-    delete,
+    get,
     web::{self, Path},
     HttpResponse,
 };
-use serde::Deserialize;
 use serde_json::json;
 use std::time::Instant;
 
@@ -22,21 +21,15 @@ fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
     ))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct Input {
-    row_key: String,
-    column_filter: Option<ColumnKey>,
-}
-
-#[delete("/v1/table/{name}/row")]
+#[get("/v1/table/{name}/metrics")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
-    req_body: web::Json<Input>,
+    req_body: web::Json<QueryInput>,
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.read().await;
+    let tables = app_state.user_tables.write().await;
 
     let table_name = path.into_inner();
 
@@ -44,28 +37,16 @@ pub async fn handler(
         return bad_request(before, "Invalid row key");
     }
 
-    if let Some(table) = tables.get(&table_name) {
-        let key = match &req_body.column_filter {
-            Some(filter) => filter.build_key(&req_body.row_key),
-            None => format!("{}:", req_body.row_key),
-        };
-
-        let count = table.delete_cells(&key)?;
-
-        let micros_per_item = if count == 0 {
-            None
-        } else {
-            Some(before.elapsed().as_micros() / count as u128)
-        };
+    if tables.get(&table_name).is_some() {
+        let rows = app_state
+            .metrics_table
+            .query_timeseries(&format!("t#{table_name}"), None)?;
 
         Ok(build_response(
             before,
-            StatusCode::ACCEPTED,
-            "Deletion completed successfully",
-            &json!({
-                "micros_per_item": micros_per_item,
-                "deleted_cells_count": count
-            }),
+            StatusCode::OK,
+            "Metrics query successful",
+            &json!(rows),
         ))
     } else {
         Ok(build_response(

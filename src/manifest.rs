@@ -31,12 +31,13 @@ impl ManifestTable {
 
         let tree = Self {
             data: lsm_tree::Config::new(manifest_table_path)
+                .level_ratio(2)
                 .level_count(2)
                 .block_cache(block_cache)
                 .max_memtable_size(/* 512 KiB */ 512 * 1_024)
+                .flush_threads(1)
                 .compaction_strategy(Arc::new(lsm_tree::compaction::Levelled {
                     l0_threshold: 1,
-                    ratio: 2,
                     target_size: 512 * 1_024,
                 }))
                 .open()?,
@@ -45,13 +46,14 @@ impl ManifestTable {
         #[cfg(debug_assertions)]
         {
             eprintln!("= MANIFEST =");
-            for item in &tree.iter()? {
+            for item in &tree.iter() {
                 let (key, value) = item?;
                 let key = std::str::from_utf8(&key).expect("should be utf-8");
                 let value = std::str::from_utf8(&value).expect("should be utf-8");
 
                 eprintln!("{key} => {value}");
             }
+            eprintln!("= MANIFEST OVER =");
         }
 
         log::info!("Recovered manifest table");
@@ -61,7 +63,7 @@ impl ManifestTable {
 
     pub fn get_user_table_names(&self) -> lsm_tree::Result<Vec<String>> {
         self.data
-            .prefix("n:")?
+            .prefix("n:")
             .into_iter()
             .map(|item| {
                 let (_, table_name) = item?;
@@ -99,7 +101,7 @@ impl ManifestTable {
         table_name: &str,
     ) -> lsm_tree::Result<Vec<ColumnFamilyDefinition>> {
         self.data
-            .prefix(format!("t:{table_name}:cf:"))?
+            .prefix(format!("t:{table_name}:cf:"))
             .into_iter()
             .map(|item| {
                 let (_, value) = item?;

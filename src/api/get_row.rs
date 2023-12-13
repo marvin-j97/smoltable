@@ -1,8 +1,10 @@
 use crate::app_state::AppState;
+use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
-use crate::table::QueryInput;
+use crate::table::writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter};
+use crate::table::{CellValue, QueryInput};
 use actix_web::http::StatusCode;
 use actix_web::{
     post,
@@ -21,7 +23,7 @@ fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
     ))
 }
 
-#[post("/table/{name}/get-row")]
+#[post("/v1/table/{name}/get-row")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
@@ -29,7 +31,7 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.write().expect("lock is poisoned");
+    let tables = app_state.user_tables.write().await;
 
     let table_name = path.into_inner();
 
@@ -38,32 +40,42 @@ pub async fn handler(
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let mut key = format!("{}:", req_body.row_key);
+        let key = match &req_body.column_filter {
+            Some(filter) => filter.build_key(&req_body.row_key),
+            None => format!("{}:", req_body.row_key),
+        };
 
-        if let Some(column_filter) = &req_body.column_filter {
-            let cf = &column_filter.family;
-
-            key.push_str(&format!("cf:{cf}"));
-
-            if let Some(cq) = &column_filter.qualifier {
-                key.push_str(&format!(":c:{cq}"));
-            }
-        }
-
-        let rows = table.query(&QueryInput {
+        let result = table.query(&QueryInput {
             row_key: key,
             column_filter: None,
-            limit: req_body.limit,
+            row_limit: req_body.row_limit,
             cell_limit: req_body.cell_limit,
         })?;
+
+        let micros_total = before.elapsed().as_micros();
+
+        TableWriter::write_raw(
+            &app_state.metrics_table.0,
+            &RowWriteItem {
+                row_key: format!("t#{table_name}"),
+                cells: vec![ColumnWriteItem {
+                    column_key: ColumnKey::try_from("lat:r#row").expect("should be column key"),
+                    timestamp: None,
+                    value: CellValue::U128(micros_total),
+                }],
+            },
+        )
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "IO error"))?;
 
         Ok(build_response(
             before,
             StatusCode::OK,
             "Query successful",
             &json!({
-                "micros": before.elapsed().as_micros(),
-                "row": rows.0.get(0)
+                "micros": micros_total,
+                "rows_scanned": result.rows_scanned_count,
+                "cells_scanned": result.cells_scanned_count,
+                "row": result.rows.get(0)
             }),
         ))
     } else {

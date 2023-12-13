@@ -1,15 +1,14 @@
 pub mod writer;
 
 use crate::column_key::ColumnKey;
-use base64::{engine::general_purpose, Engine as _};
 use lsm_tree::{Batch, BlockCache, Tree as LsmTree};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Bound, path::Path, sync::Arc};
 
-const MEMTABLE_SIZE: u32 = /* 32 MiB */ 32 * 1024 * 1024;
+const BLOCK_SIZE: u32 = /* 16 KiB */ 16 * 1024;
 
 #[derive(Clone)]
-pub struct SmolTable {
+pub struct Smoltable {
     pub tree: LsmTree,
 }
 
@@ -17,14 +16,26 @@ pub struct SmolTable {
 pub struct QueryInput {
     pub row_key: String,
     pub column_filter: Option<ColumnKey>,
-    pub limit: Option<u16>, // TODO: rename row_limit
+    pub row_limit: Option<u16>,
     pub cell_limit: Option<u16>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub enum CellValue {
+    String(String),
+    Boolean(bool),
+    U8(u8),
+    I32(i32),
+    I64(i64),
+    U128(u128),
+    F32(f32),
+    F64(f64),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Cell {
     pub timestamp: u128,
-    pub value: String, // base64-encoded
+    pub value: CellValue,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -34,42 +45,46 @@ pub struct Row {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct QueryOutput(pub Vec<Row>);
+pub struct QueryOutput {
+    pub rows: Vec<Row>,
+    pub cells_scanned_count: u64,
+    pub rows_scanned_count: u64,
+}
 
 #[derive(Debug)]
 pub struct VisitedCell {
     pub row_key: String,
     pub column_key: ColumnKey,
     pub timestamp: u128,
-    pub value: String, // base64-encoded
+    pub value: CellValue,
 }
 
-impl SmolTable {
+impl Smoltable {
     pub fn new<P: AsRef<Path>>(
         path: P,
         block_cache: Arc<BlockCache>,
-    ) -> lsm_tree::Result<SmolTable> {
+    ) -> lsm_tree::Result<Smoltable> {
         let path = path.as_ref();
 
         let tree = lsm_tree::Config::new(path)
             .level_count(4)
-            .max_memtable_size(MEMTABLE_SIZE)
             .compaction_strategy(Arc::new(lsm_tree::compaction::Levelled {
-                target_size: MEMTABLE_SIZE.into(),
+                target_size: 64 * 1_024 * 1_024,
                 l0_threshold: 2,
-                ratio: 4,
             }))
+            .flush_threads(1)
+            .block_size(BLOCK_SIZE)
             .block_cache(block_cache)
             .open()?;
 
         Self::from_tree(tree)
     }
 
-    pub fn from_tree(tree: LsmTree) -> lsm_tree::Result<SmolTable> {
+    pub fn from_tree(tree: LsmTree) -> lsm_tree::Result<Smoltable> {
         Ok(Self { tree })
     }
 
-    pub fn delete_row(&self, key: &str) -> lsm_tree::Result<u64> {
+    pub fn delete_cells(&self, key: &str) -> lsm_tree::Result<u64> {
         use std::ops::Bound::{Excluded, Included, Unbounded};
 
         let prefix_key = format!("{}:", key);
@@ -77,7 +92,7 @@ impl SmolTable {
 
         let Some(first_item) = self
             .tree
-            .prefix(prefix_key.clone())?
+            .prefix(prefix_key.clone())
             .into_iter()
             .next()
             .transpose()?
@@ -91,7 +106,7 @@ impl SmolTable {
         loop {
             let chunk = self
                 .tree
-                .range(range.clone())?
+                .range(range.clone())
                 .into_iter()
                 .take(1_000)
                 .collect::<lsm_tree::Result<Vec<_>>>()?;
@@ -118,12 +133,16 @@ impl SmolTable {
     }
 
     pub fn query(&self, input: &QueryInput) -> lsm_tree::Result<QueryOutput> {
+        dbg!("query", input);
+
         let key = input.row_key.as_bytes();
 
         let snapshot = self.tree.snapshot();
-        let iter = snapshot.prefix(key)?;
+        let iter = snapshot.prefix(key);
 
-        let mut iter = iter.into_iter().map(|item| {
+        let mut cells_scanned_count = 0;
+
+        let iter = iter.into_iter().map(|item| {
             let (key, value) = item?;
 
             let parsed_key = key.splitn(7, |&e| e == b':');
@@ -135,8 +154,10 @@ impl SmolTable {
             let cq = std::str::from_utf8(chunks[4]).ok().map(Into::into);
 
             let mut buf = [0; std::mem::size_of::<u128>()];
-            buf.clone_from_slice(&chunks[5][..std::mem::size_of::<u128>()]);
+            buf.clone_from_slice(&key[key.len() - std::mem::size_of::<u128>()..key.len()]);
             let ts = !u128::from_be_bytes(buf);
+
+            cells_scanned_count += 1;
 
             Ok::<_, lsm_tree::Error>(VisitedCell {
                 row_key: row_key.into(),
@@ -145,35 +166,21 @@ impl SmolTable {
                     family: cf.to_owned(),
                     qualifier: cq,
                 },
-                value: general_purpose::STANDARD.encode(value),
+                value: bincode::deserialize::<CellValue>(&value).expect("should deserialize"),
             })
         });
 
         let mut rows = vec![];
 
-        let Some(first_cell) = iter.next().transpose()? else {
-            return Ok(QueryOutput(rows));
+        let mut current_row = Row {
+            key: "".into(),
+            columns: Default::default(),
         };
 
-        let mut row = Row {
-            key: first_cell.row_key,
-            columns: {
-                let mut map = HashMap::<String, HashMap<String, Vec<Cell>>>::default();
+        let mut rows_scanned_count = 0;
 
-                map.entry(first_cell.column_key.family).or_default().insert(
-                    first_cell.column_key.qualifier.unwrap_or(String::from("")),
-                    vec![Cell {
-                        timestamp: first_cell.timestamp,
-                        value: first_cell.value,
-                    }],
-                );
-
-                map
-            },
-        };
-
-        for item in iter {
-            if rows.len() >= input.limit.unwrap_or(u16::MAX) as usize {
+        for (_, item) in iter.enumerate() {
+            if rows.len() >= input.row_limit.unwrap_or(u16::MAX) as usize {
                 break;
             }
 
@@ -191,17 +198,23 @@ impl SmolTable {
                 }
             }
 
-            if cell.row_key != row.key {
+            if current_row.key.is_empty() {
+                current_row.key = cell.row_key.clone();
+            }
+
+            if cell.row_key != current_row.key {
                 // Rotate over to new row
-                rows.push(row);
-                row = Row {
+                rows.push(current_row);
+                rows_scanned_count += 1;
+
+                current_row = Row {
                     key: cell.row_key,
                     columns: HashMap::default(),
-                }
+                };
             }
 
             // Append cell
-            let version_history = row
+            let version_history = current_row
                 .columns
                 .entry(cell.column_key.family)
                 .or_default()
@@ -216,11 +229,16 @@ impl SmolTable {
             }
         }
 
-        if !row.columns.is_empty() {
-            rows.push(row);
+        if !current_row.columns.is_empty() {
+            rows.push(current_row);
+            rows_scanned_count += 1;
         }
 
-        Ok(QueryOutput(rows))
+        Ok(QueryOutput {
+            rows,
+            rows_scanned_count,
+            cells_scanned_count,
+        })
     }
 
     pub fn batch(&self) -> Batch {

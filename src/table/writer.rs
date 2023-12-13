@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
-use super::SmolTable;
+use super::{CellValue, Smoltable};
 use crate::{column_key::ColumnKey, identifier::is_valid_identifier, manifest::ManifestTable};
-use base64::{engine::general_purpose, Engine as _};
 use lsm_tree::Batch;
 use serde::Deserialize;
 
 pub struct Writer {
     manifest_table: Arc<ManifestTable>,
-    target_table: SmolTable,
+    target_table: Smoltable,
     batch: Batch,
     table_name: String,
 }
@@ -17,7 +16,7 @@ pub struct Writer {
 pub struct ColumnWriteItem {
     pub column_key: ColumnKey,
     pub timestamp: Option<u128>,
-    pub value: String, // base64-encoded
+    pub value: CellValue,
 }
 
 #[derive(Debug, Deserialize)]
@@ -48,8 +47,8 @@ fn timestamp_nano() -> u128 {
 impl Writer {
     pub fn new(
         manifest_table: Arc<ManifestTable>,
-        target_table: SmolTable,
-        table_name: String,
+        target_table: Smoltable,
+        table_name: &str,
     ) -> Self {
         let batch = target_table.batch();
 
@@ -57,11 +56,11 @@ impl Writer {
             manifest_table,
             target_table,
             batch,
-            table_name,
+            table_name: table_name.into(),
         }
     }
 
-    pub fn write_raw(table: &SmolTable, item: &RowWriteItem) -> Result<(), WriteError> {
+    pub fn write_raw(table: &Smoltable, item: &RowWriteItem) -> Result<(), WriteError> {
         for cell in &item.cells {
             let mut key = format!(
                 "{}:cf:{}:c:{}:",
@@ -79,13 +78,8 @@ impl Writer {
             // NOTE: Reverse the timestamp to store it in descending order
             key.extend_from_slice(&(!cell.timestamp.unwrap_or_else(timestamp_nano)).to_be_bytes());
 
-            let Ok(decoded_value) = general_purpose::STANDARD.decode(&cell.value) else {
-                return Err(WriteError::BadInput(
-                    "Invalid value: could not be base64-decoded",
-                ));
-            };
-
-            table.tree.insert(key, decoded_value)?;
+            let encoded_value = bincode::serialize(&cell.value).expect("should serialize");
+            table.tree.insert(key, encoded_value)?;
         }
 
         Ok(())
@@ -122,13 +116,8 @@ impl Writer {
             // NOTE: Reverse the timestamp to store it in descending order
             key.extend_from_slice(&(!cell.timestamp.unwrap_or_else(timestamp_nano)).to_be_bytes());
 
-            let Ok(decoded_value) = general_purpose::STANDARD.decode(&cell.value) else {
-                return Err(WriteError::BadInput(
-                    "Invalid value: could not be base64-decoded",
-                ));
-            };
-
-            self.batch.insert(key, decoded_value);
+            let encoded_value = bincode::serialize(&cell.value).expect("should serialize");
+            self.batch.insert(key, encoded_value);
         }
 
         Ok(())

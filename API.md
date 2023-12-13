@@ -19,7 +19,7 @@ Creates a new table. The name should be unique.
 
 ### URI
 
-`PUT /table/{name}`
+`PUT /v1/table/{name}`
 
 ### Result
 
@@ -31,7 +31,7 @@ Creates a new column family in the given table.
 
 ### URI
 
-`PUT /table/{name}/column-family/{name}`
+`PUT /v1/table/{name}/column-family/{name}`
 
 ### Request body
 
@@ -49,7 +49,7 @@ List all tables, their column families and some up-to-date statistics.
 
 ### URI
 
-`GET /table/{name}`
+`GET /v1/table/{name}`
 
 ### Result
 
@@ -84,7 +84,7 @@ Shows some up-to-date system metrics.
 
 ### URI
 
-`GET /system`
+`GET /v1/system`
 
 ### Results
 
@@ -111,7 +111,7 @@ Adds data to a table.
 
 ### URI
 
-`POST /table/{name}/write`
+`POST /v1/table/{name}/write`
 
 ### Request body
 
@@ -158,7 +158,7 @@ Gets a row, optionally filtering by specific columns.
 
 ### URI
 
-`GET /table/{name}/get-row`
+`GET /v1/table/{name}/get-row`
 
 ### Request body
 
@@ -187,7 +187,7 @@ Scans rows using a prefix, optionally by specific columns.
 
 ### URI
 
-`GET /table/{name}/prefix`
+`GET /v1/table/{name}/prefix`
 
 ### Request body
 
@@ -215,7 +215,7 @@ Deletes a row or some of its columns.
 
 ### URI
 
-`DELETE /table/{name}/get-row`
+`DELETE /v1/table/{name}/get-row`
 
 ### Request body
 
