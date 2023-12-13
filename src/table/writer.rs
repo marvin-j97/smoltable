@@ -1,13 +1,11 @@
-use std::sync::Arc;
-
 use super::{CellValue, Smoltable};
 use crate::{column_key::ColumnKey, identifier::is_valid_identifier, manifest::ManifestTable};
 use lsm_tree::Batch;
 use serde::Deserialize;
+use std::sync::Arc;
 
 pub struct Writer {
     manifest_table: Arc<ManifestTable>,
-    target_table: Smoltable,
     batch: Batch,
     table_name: String,
 }
@@ -54,7 +52,6 @@ impl Writer {
 
         Self {
             manifest_table,
-            target_table,
             batch,
             table_name: table_name.into(),
         }

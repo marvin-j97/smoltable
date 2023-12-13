@@ -55,7 +55,7 @@ pub async fn handler(
         let micros_total = before.elapsed().as_micros();
 
         TableWriter::write_raw(
-            &app_state.metrics_table.0,
+            &app_state.metrics_table,
             &RowWriteItem {
                 row_key: format!("t#{table_name}"),
                 cells: vec![ColumnWriteItem {

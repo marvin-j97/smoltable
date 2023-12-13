@@ -6,7 +6,15 @@ use crate::{
 use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct MetricsTable(pub Smoltable);
+pub struct MetricsTable(Smoltable);
+
+impl std::ops::Deref for MetricsTable {
+    type Target = Smoltable;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl MetricsTable {
     pub fn new(block_cache: Arc<lsm_tree::BlockCache>) -> lsm_tree::Result<Self> {

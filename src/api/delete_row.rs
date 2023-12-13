@@ -34,7 +34,7 @@ pub async fn handler(
     app_state: web::Data<AppState>,
     req_body: web::Json<Input>,
 ) -> CustomRouteResult<HttpResponse> {
-    let before = std::time::Instant::now();
+    let before = Instant::now();
 
     let tables = app_state.user_tables.read().await;
 

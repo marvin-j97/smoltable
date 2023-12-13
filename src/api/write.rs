@@ -78,7 +78,7 @@ pub async fn handler(
         };
 
         TableWriter::write_raw(
-            &app_state.metrics_table.0,
+            &app_state.metrics_table,
             &RowWriteItem {
                 row_key: format!("t#{table_name}"),
                 cells: vec![ColumnWriteItem {

@@ -133,6 +133,8 @@ impl ManifestTable {
             batch.remove(item.name);
         }
 
-        batch.commit()
+        batch.commit()?;
+
+        Ok(())
     }
 }

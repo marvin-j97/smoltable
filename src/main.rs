@@ -112,10 +112,10 @@ async fn main() -> lsm_tree::Result<()> {
                 let user_tables = user_tables.read().await;
 
                 for (table_name, table) in user_tables.iter() {
-                    let folder_size = table.disk_space_usage().expect("should get size");
+                    let folder_size = table.disk_space_usage().unwrap_or(0);
 
                     TableWriter::write_raw(
-                        &metrics_table.0,
+                        &metrics_table,
                         &RowWriteItem {
                             row_key: format!("t#{table_name}"),
                             cells: vec![
@@ -145,7 +145,7 @@ async fn main() -> lsm_tree::Result<()> {
                 drop(user_tables);
 
                 TableWriter::write_raw(
-                    &metrics_table.0,
+                    &metrics_table,
                     &RowWriteItem {
                         row_key: "sys".to_string(),
                         cells: vec![
@@ -166,7 +166,7 @@ async fn main() -> lsm_tree::Result<()> {
                 )
                 .expect("should write");
 
-                metrics_table.0.tree.flush().unwrap();
+                metrics_table.tree.flush().unwrap();
 
                 tokio::time::sleep(Duration::from_secs(60)).await;
             }
@@ -206,6 +206,7 @@ async fn main() -> lsm_tree::Result<()> {
             .service(api::prefix::handler)
             .service(api::create_column_family::handler)
             .service(api::metrics::handler)
+            .service(api::delete_table::handler)
             .service(actix_files::Files::new("/", "./dist"))
             .default_service(web::route().to(catch_all))
     })
