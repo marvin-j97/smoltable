@@ -147,13 +147,13 @@ async fn main() -> lsm_tree::Result<()> {
                 for (table_name, table) in tables.iter() {
                     log::debug!("Counting {table_name}");
 
-                    if let Ok(count) = table.len() {
+                    if let Ok(count) = table.cell_count() {
                         TableWriter::write_raw(
                             &metrics_table,
                             &RowWriteItem {
                                 row_key: format!("t#{table_name}"),
                                 cells: vec![ColumnWriteItem {
-                                    column_key: ColumnKey::try_from("stats:len")
+                                    column_key: ColumnKey::try_from("stats:cell_cnt")
                                         .expect("should be column key"),
                                     timestamp: None,
                                     value: table::cell::Value::F64(count as f64),

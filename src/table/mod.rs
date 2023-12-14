@@ -63,8 +63,8 @@ impl Smoltable {
         Ok(Self { tree })
     }
 
-    // TODO: need to deduplicate items with same row key
-    pub fn len(&self) -> lsm_tree::Result<usize> {
+    // TODO: use approximate_len in Tree
+    pub fn cell_count(&self) -> lsm_tree::Result<usize> {
         use std::ops::Bound::{Excluded, Unbounded};
 
         let snapshot = self.tree.snapshot();

@@ -1,6 +1,7 @@
 use crate::{
     column_key::ColumnKey,
     data_folder,
+    env::metrics_cap_mb,
     table::{cell::Row, QueryInput, Smoltable},
 };
 use std::sync::Arc;
@@ -25,13 +26,15 @@ impl MetricsTable {
         let metrics_table_path = data_folder().join("tables").join("_metrics");
         log::info!("Opening metrics table at {}", metrics_table_path.display());
 
+        let max_mb = u64::from(metrics_cap_mb());
+
         let tree = lsm_tree::Config::new(metrics_table_path.clone())
             .fsync_ms(None)
             .level_count(2)
             .block_cache(block_cache)
             .max_memtable_size(/* 1 MiB */ 1_024 * 1_024)
             .compaction_strategy(lsm_tree::compaction::Fifo::new(
-                /* 100 MiB */ 100 * 1_024 * 1_024,
+                /* N MiB */ max_mb * 1_000 * 1_000,
             ))
             .flush_threads(1)
             .open()?;
