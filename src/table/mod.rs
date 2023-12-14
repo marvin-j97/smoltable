@@ -63,7 +63,7 @@ impl Smoltable {
         Ok(Self { tree })
     }
 
-    // TODO: use approximate_len in Tree
+    // TODO: use approximate_len in Tree and set to 1 min
     pub fn cell_count(&self) -> lsm_tree::Result<usize> {
         use std::ops::Bound::{Excluded, Unbounded};
 
@@ -134,16 +134,143 @@ impl Smoltable {
         Ok(count)
     }
 
-    // TODO: use non-locking (chunked) iterator
     pub fn query(&self, input: &QueryInput) -> lsm_tree::Result<QueryOutput> {
-        let key = input.row_key.as_bytes();
+        use std::ops::Bound::{Excluded, Included, Unbounded};
 
         let snapshot = self.tree.snapshot();
-        let iter = snapshot.prefix(key);
 
+        let prefix_key = input.row_key.as_bytes();
         let mut cells_scanned_count = 0;
+        let mut rows_scanned_count = 0;
 
-        let iter = iter.into_iter().map(|item| {
+        let mut rows = vec![];
+        let mut current_row = Row {
+            key: "".into(),
+            columns: Default::default(),
+        };
+
+        let Some((first_key, _)) = snapshot.prefix(prefix_key).into_iter().next().transpose()?
+        else {
+            return Ok(QueryOutput {
+                rows,
+                cells_scanned_count,
+                rows_scanned_count,
+            });
+        };
+
+        let mut range: (Bound<Vec<u8>>, Bound<Vec<u8>>) = (Included(first_key.to_vec()), Unbounded);
+
+        loop {
+            let chunk = snapshot
+                .range(range.clone())
+                .into_iter()
+                .take(1_000)
+                .filter(|x| match x {
+                    Ok((key, _)) => key.starts_with(prefix_key),
+                    Err(_) => true,
+                })
+                .collect::<lsm_tree::Result<Vec<_>>>()?;
+
+            if chunk.is_empty() {
+                break;
+            }
+
+            if rows.len() >= input.row_limit.unwrap_or(u16::MAX) as usize {
+                break;
+            }
+
+            let cells = chunk
+                .iter()
+                .map(|(key, value)| {
+                    let parsed_key = key.splitn(7, |&e| e == b':');
+
+                    let chunks = parsed_key.collect::<Vec<_>>();
+
+                    let row_key = std::str::from_utf8(chunks[0]).unwrap();
+                    let cf = std::str::from_utf8(chunks[2]).unwrap();
+                    let cq = std::str::from_utf8(chunks[4]).ok().map(Into::into);
+
+                    let mut buf = [0; std::mem::size_of::<u128>()];
+                    buf.clone_from_slice(&key[key.len() - std::mem::size_of::<u128>()..key.len()]);
+                    let ts = !u128::from_be_bytes(buf);
+
+                    cells_scanned_count += 1;
+
+                    Ok::<_, lsm_tree::Error>(VisitedCell {
+                        row_key: row_key.into(),
+                        timestamp: ts,
+                        column_key: ColumnKey {
+                            family: cf.to_owned(),
+                            qualifier: cq,
+                        },
+                        value: bincode::deserialize::<CellValue>(value)
+                            .expect("should deserialize"),
+                    })
+                })
+                .collect::<lsm_tree::Result<Vec<_>>>()?;
+
+            for cell in cells {
+                if let Some(col_filter) = &input.column_filter {
+                    if cell.column_key.family != col_filter.family {
+                        continue;
+                    }
+
+                    if let Some(cq_filter) = &col_filter.qualifier {
+                        if cell.column_key.qualifier.as_deref().unwrap_or("") != cq_filter {
+                            continue;
+                        }
+                    }
+                }
+
+                if current_row.key.is_empty() {
+                    current_row.key = cell.row_key.clone();
+                }
+
+                if cell.row_key != current_row.key {
+                    // Rotate over to new row
+                    rows.push(current_row);
+                    rows_scanned_count += 1;
+
+                    current_row = Row {
+                        key: cell.row_key,
+                        columns: HashMap::default(),
+                    };
+                }
+
+                // Append cell
+                let version_history = current_row
+                    .columns
+                    .entry(cell.column_key.family)
+                    .or_default()
+                    .entry(cell.column_key.qualifier.unwrap_or(String::from("_")))
+                    .or_default();
+
+                if version_history.len() < input.cell_limit.unwrap_or(u16::MAX) as usize {
+                    version_history.push(Cell {
+                        timestamp: cell.timestamp,
+                        value: cell.value,
+                    });
+                }
+            }
+
+            let (last_key, _) = chunk.last().unwrap();
+            range = (Excluded(last_key.to_vec()), Unbounded);
+        }
+
+        if !current_row.columns.is_empty() {
+            rows.push(current_row);
+            rows_scanned_count += 1;
+        }
+
+        Ok(QueryOutput {
+            rows,
+            rows_scanned_count,
+            cells_scanned_count,
+        })
+
+        // let iter = snapshot.prefix(key);
+
+        /* let iter = iter.into_iter().map(|item| {
             let (key, value) = item?;
 
             let parsed_key = key.splitn(7, |&e| e == b':');
@@ -169,9 +296,9 @@ impl Smoltable {
                 },
                 value: bincode::deserialize::<CellValue>(&value).expect("should deserialize"),
             })
-        });
+        }); */
 
-        let mut rows = vec![];
+        /* let mut rows = vec![];
 
         let mut current_row = Row {
             key: "".into(),
@@ -239,7 +366,7 @@ impl Smoltable {
             rows,
             rows_scanned_count,
             cells_scanned_count,
-        })
+        }) */
     }
 
     pub fn batch(&self) -> Batch {

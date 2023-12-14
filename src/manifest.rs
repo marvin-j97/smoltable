@@ -25,7 +25,7 @@ impl std::ops::Deref for ManifestTable {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ColumnFamilyDefinition {
     pub name: String,
-    pub row_limit: Option<u64>, // TODO: rename cell limit
+    pub version_limit: Option<u64>,
 }
 
 impl ManifestTable {

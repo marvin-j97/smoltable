@@ -13,7 +13,7 @@ use serde_json::json;
 
 #[derive(Debug, Deserialize)]
 pub struct Input {
-    row_limit: Option<u64>,
+    version_limit: Option<u64>,
 }
 
 #[put("/v1/table/{name}/column-family/{cf_name}")]
@@ -51,12 +51,9 @@ pub async fn handler(
         &table_name,
         &ColumnFamilyDefinition {
             name: cf_name,
-            row_limit: req_body.row_limit,
+            version_limit: req_body.version_limit,
         },
     )?;
-
-    // TODO: spawn GC thread... spawn on recover as well
-    // stop on delete table
 
     Ok(build_response(
         before.elapsed(),

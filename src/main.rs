@@ -122,7 +122,7 @@ async fn main() -> lsm_tree::Result<()> {
                 "_metrics",
                 &ColumnFamilyDefinition {
                     name: "stats".into(),
-                    row_limit: None,
+                    version_limit: None,
                 },
             )?;
         }
