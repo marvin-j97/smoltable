@@ -63,7 +63,7 @@ impl Smoltable {
         Ok(Self { tree })
     }
 
-    // TODO: use approximate_len in Tree and set to 1 min
+    // TODO: use approximate_len in Tree
     pub fn cell_count(&self) -> lsm_tree::Result<usize> {
         use std::ops::Bound::{Excluded, Unbounded};
 

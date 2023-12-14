@@ -170,7 +170,7 @@ async fn main() -> lsm_tree::Result<()> {
 
                 metrics_table.tree.flush().unwrap();
 
-                tokio::time::sleep(Duration::from_secs(3_600)).await;
+                tokio::time::sleep(Duration::from_secs(60)).await;
             }
         });
     }
