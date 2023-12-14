@@ -1,5 +1,7 @@
+pub mod cell;
 pub mod writer;
 
+use self::cell::{Cell, Row, Value as CellValue};
 use crate::column_key::ColumnKey;
 use lsm_tree::{Batch, BlockCache, Tree as LsmTree};
 use serde::{Deserialize, Serialize};
@@ -18,30 +20,6 @@ pub struct QueryInput {
     pub column_filter: Option<ColumnKey>,
     pub row_limit: Option<u16>,
     pub cell_limit: Option<u16>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub enum CellValue {
-    String(String),
-    Boolean(bool),
-    U8(u8),
-    I32(i32),
-    I64(i64),
-    U128(u128),
-    F32(f32),
-    F64(f64),
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct Cell {
-    pub timestamp: u128,
-    pub value: CellValue,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Row {
-    pub key: String,
-    pub columns: HashMap<String, HashMap<String, Vec<Cell>>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

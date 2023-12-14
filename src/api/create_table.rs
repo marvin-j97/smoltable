@@ -18,6 +18,15 @@ pub async fn handler(
 
     let table_name = path.into_inner();
 
+    if table_name.starts_with('_') {
+        return Ok(build_response(
+            before,
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
+    }
+
     if !is_valid_identifier(&table_name) {
         return Ok(build_response(
             before,
@@ -27,7 +36,7 @@ pub async fn handler(
         ));
     }
 
-    let tables = app_state.user_tables.read().await;
+    let tables = app_state.tables.read().await;
     if tables.contains_key(&table_name) {
         return Ok(build_response(
             before,

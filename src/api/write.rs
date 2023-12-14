@@ -1,9 +1,11 @@
+use super::bad_request;
 use crate::app_state::AppState;
 use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
+use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
-use crate::table::writer::{ColumnWriteItem, RowWriteItem, WriteError, Writer as TableWriter};
-use crate::table::CellValue;
+use crate::table::cell::Value as CellValue;
+use crate::table::writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter};
 use actix_web::http::StatusCode;
 use actix_web::{
     post,
@@ -12,20 +14,10 @@ use actix_web::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use std::time::Instant;
 
 #[derive(Debug, Deserialize)]
 pub struct Input {
     items: Vec<RowWriteItem>,
-}
-
-fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
-    Ok(build_response(
-        before,
-        StatusCode::BAD_REQUEST,
-        msg,
-        &json!(null),
-    ))
 }
 
 #[post("/v1/table/{name}/write")]
@@ -36,7 +28,7 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.read().await;
+    let tables = app_state.tables.read().await;
 
     let table_name = path.into_inner();
 
@@ -45,19 +37,33 @@ pub async fn handler(
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let mut writer =
-            TableWriter::new(app_state.manifest_table.clone(), table.clone(), &table_name);
+        let mut writer = TableWriter::new(table);
 
         drop(tables);
 
         for row in &req_body.items {
-            if let Err(write_error) = writer.write(row) {
-                use WriteError::{BadInput, Lsm};
+            if !is_valid_identifier(&row.row_key) {
+                return bad_request(before, "Invalid row key");
+            }
 
-                match write_error {
-                    BadInput(msg) => return bad_request(before, msg),
-                    Lsm(e) => return Err(e.into()),
+            for cell in &row.cells {
+                if !app_state
+                    .manifest_table
+                    .column_family_exists(&table_name, &cell.column_key.family)?
+                {
+                    return bad_request(before, "Column family does not exist");
                 }
+            }
+
+            if let Err(write_error) = writer.write(row) {
+                log::error!("Write error: {write_error:#?}");
+
+                return Ok(build_response(
+                    before,
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error",
+                    &json!(null),
+                ));
             };
         }
 

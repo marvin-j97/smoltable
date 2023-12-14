@@ -1,3 +1,4 @@
+use super::bad_request;
 use crate::app_state::AppState;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_identifier;
@@ -10,16 +11,6 @@ use actix_web::{
     HttpResponse,
 };
 use serde_json::json;
-use std::time::Instant;
-
-fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
-    Ok(build_response(
-        before,
-        StatusCode::BAD_REQUEST,
-        msg,
-        &json!(null),
-    ))
-}
 
 #[get("/v1/table/{name}/metrics")]
 pub async fn handler(
@@ -29,7 +20,7 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.write().await;
+    let tables = app_state.tables.write().await;
 
     let table_name = path.into_inner();
 

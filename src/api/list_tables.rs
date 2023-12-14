@@ -24,7 +24,7 @@ struct TableListEntry {
 pub async fn handler(app_state: web::Data<AppState>) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.read().await;
+    let tables = app_state.tables.read().await;
 
     let tables = tables
         .iter()

@@ -1,7 +1,7 @@
 use crate::{
     column_key::ColumnKey,
     data_folder,
-    table::{QueryInput, Row, Smoltable},
+    table::{cell::Row, QueryInput, Smoltable},
 };
 use std::sync::Arc;
 
@@ -17,8 +17,12 @@ impl std::ops::Deref for MetricsTable {
 }
 
 impl MetricsTable {
-    pub fn new(block_cache: Arc<lsm_tree::BlockCache>) -> lsm_tree::Result<Self> {
-        let metrics_table_path = data_folder().join("metrics");
+    pub fn from_table(table: Smoltable) -> Self {
+        Self(table)
+    }
+
+    pub fn create_new(block_cache: Arc<lsm_tree::BlockCache>) -> lsm_tree::Result<Self> {
+        let metrics_table_path = data_folder().join("tables").join("_metrics");
         log::info!("Opening metrics table at {}", metrics_table_path.display());
 
         let tree = lsm_tree::Config::new(metrics_table_path.clone())

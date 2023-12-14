@@ -16,9 +16,10 @@ use actix_web::{
 use app_state::AppState;
 use column_key::ColumnKey;
 use error::CustomRouteResult;
+use manifest::ColumnFamilyDefinition;
 use manifest::ManifestTable;
 use metrics::MetricsTable;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use sysinfo::SystemExt;
 use table::{
     writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter},
@@ -33,26 +34,24 @@ use jemallocator::Jemalloc;
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc; */
 
-fn recover_user_tables(
-    manifest_table: &ManifestTable,
-) -> lsm_tree::Result<HashMap<String, Smoltable>> {
+fn recover_tables(manifest_table: &ManifestTable) -> lsm_tree::Result<HashMap<String, Smoltable>> {
     log::info!("Recovering user tables");
 
-    let mut user_tables = HashMap::default();
+    let mut tables = HashMap::default();
 
     for table_name in manifest_table.get_user_table_names()? {
         log::debug!("Recovering user table {table_name}");
 
         let recovered_table = Smoltable::new(
-            data_folder().join("user_tables").join(&table_name),
+            data_folder().join("tables").join(&table_name),
             manifest_table.config().block_cache.clone(),
         )?;
-        user_tables.insert(table_name, recovered_table);
+        tables.insert(table_name, recovered_table);
     }
 
-    log::info!("Recovered {} user tables", user_tables.len());
+    log::info!("Recovered {} tables", tables.len());
 
-    Ok(user_tables)
+    Ok(tables)
 }
 
 async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse> {
@@ -97,13 +96,31 @@ async fn main() -> lsm_tree::Result<()> {
     ));
 
     let manifest_table = ManifestTable::open(block_cache.clone())?;
-    let user_tables = Arc::new(RwLock::new(recover_user_tables(&manifest_table)?));
-    let metrics_table = MetricsTable::new(block_cache)?;
+    let mut tables = recover_tables(&manifest_table)?;
+
+    let metrics_table = if let Some(table) = tables.get("_metrics") {
+        MetricsTable::from_table(table.clone())
+    } else {
+        let table = MetricsTable::create_new(block_cache)?;
+        tables.insert("_metrics".into(), table.deref().clone());
+        manifest_table.persist_user_table("_metrics")?;
+        manifest_table.persist_column_family(
+            "_metrics",
+            &ColumnFamilyDefinition {
+                name: "stats".into(),
+                row_limit: None,
+            },
+        )?;
+
+        table
+    };
+
     let manifest_table = Arc::new(manifest_table);
+    let tables = Arc::new(RwLock::new(recover_tables(&manifest_table)?));
 
     {
         let metrics_table = metrics_table.clone();
-        let user_tables = user_tables.clone();
+        let tables = tables.clone();
 
         log::debug!("Starting system metrics worker");
 
@@ -114,9 +131,9 @@ async fn main() -> lsm_tree::Result<()> {
 
                 let sysinfo = sysinfo::System::new_all();
 
-                let user_tables = user_tables.read().await;
+                let tables = tables.read().await;
 
-                for (table_name, table) in user_tables.iter() {
+                for (table_name, table) in tables.iter() {
                     let folder_size = table.disk_space_usage().unwrap_or(0);
 
                     TableWriter::write_raw(
@@ -128,26 +145,30 @@ async fn main() -> lsm_tree::Result<()> {
                                     column_key: ColumnKey::try_from("stats:du")
                                         .expect("should be column key"),
                                     timestamp: None,
-                                    value: table::CellValue::I64(folder_size as i64),
+                                    value: table::cell::Value::F64(folder_size as f64),
                                 },
                                 ColumnWriteItem {
                                     column_key: ColumnKey::try_from("stats:mem_cache")
                                         .expect("should be column key"),
                                     timestamp: None,
-                                    value: table::CellValue::I64(table.cache_memory_usage() as i64),
+                                    value: table::cell::Value::F64(
+                                        table.cache_memory_usage() as f64
+                                    ),
                                 },
                                 ColumnWriteItem {
                                     column_key: ColumnKey::try_from("stats:cache_blocks")
                                         .expect("should be column key"),
                                     timestamp: None,
-                                    value: table::CellValue::I64(table.cached_block_count() as i64),
+                                    value: table::cell::Value::F64(
+                                        table.cached_block_count() as f64
+                                    ),
                                 },
                             ],
                         },
                     )
                     .expect("should write");
                 }
-                drop(user_tables);
+                drop(tables);
 
                 TableWriter::write_raw(
                     &metrics_table,
@@ -158,13 +179,13 @@ async fn main() -> lsm_tree::Result<()> {
                                 column_key: ColumnKey::try_from("stats:cpu")
                                     .expect("should be column key"),
                                 timestamp: None,
-                                value: table::CellValue::F64(sysinfo.load_average().one),
+                                value: table::cell::Value::F64(sysinfo.load_average().one),
                             },
                             ColumnWriteItem {
                                 column_key: ColumnKey::try_from("stats:mem")
                                     .expect("should be column key"),
                                 timestamp: None,
-                                value: table::CellValue::I64(sysinfo.used_memory() as i64),
+                                value: table::cell::Value::F64(sysinfo.used_memory() as f64),
                             },
                         ],
                     },
@@ -181,7 +202,7 @@ async fn main() -> lsm_tree::Result<()> {
     let app_state = web::Data::new(AppState {
         manifest_table,
         metrics_table,
-        user_tables,
+        tables,
     });
 
     log::info!("Starting on port {port}");

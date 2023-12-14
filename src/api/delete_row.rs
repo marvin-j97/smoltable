@@ -1,3 +1,4 @@
+use super::bad_request;
 use crate::app_state::AppState;
 use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
@@ -11,16 +12,6 @@ use actix_web::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use std::time::Instant;
-
-fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
-    Ok(build_response(
-        before,
-        StatusCode::BAD_REQUEST,
-        msg,
-        &json!(null),
-    ))
-}
 
 #[derive(Debug, Deserialize)]
 pub struct Input {
@@ -34,9 +25,9 @@ pub async fn handler(
     app_state: web::Data<AppState>,
     req_body: web::Json<Input>,
 ) -> CustomRouteResult<HttpResponse> {
-    let before = Instant::now();
+    let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.read().await;
+    let tables = app_state.tables.read().await;
 
     let table_name = path.into_inner();
 
