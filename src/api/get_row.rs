@@ -43,7 +43,9 @@ pub async fn handler(
             cell_limit: req_body.cell_limit,
         })?;
 
-        let micros_total = before.elapsed().as_micros();
+        let dur = before.elapsed();
+
+        let micros_total = dur.as_micros();
 
         TableWriter::write_raw(
             &app_state.metrics_table,
@@ -52,14 +54,15 @@ pub async fn handler(
                 cells: vec![ColumnWriteItem {
                     column_key: ColumnKey::try_from("lat:r#row").expect("should be column key"),
                     timestamp: None,
-                    value: CellValue::U128(micros_total),
+                    value: CellValue::F64(micros_total as f64),
                 }],
             },
         )
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "IO error"))?;
+        .ok();
+        app_state.metrics_table.tree.flush().ok();
 
         Ok(build_response(
-            before,
+            dur,
             StatusCode::OK,
             "Query successful",
             &json!({
@@ -71,7 +74,7 @@ pub async fn handler(
         ))
     } else {
         Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::CONFLICT,
             "Table not found",
             &json!(null),

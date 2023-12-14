@@ -50,7 +50,7 @@ pub async fn handler(
         };
 
         Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::ACCEPTED,
             "Deletion completed successfully",
             &json!({
@@ -60,7 +60,7 @@ pub async fn handler(
         ))
     } else {
         Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::CONFLICT,
             "Table not found",
             &json!(null),

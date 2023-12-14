@@ -20,7 +20,7 @@ pub async fn handler(
 
     if table_name.starts_with('_') {
         return Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::BAD_REQUEST,
             "Invalid table name",
             &json!(null),
@@ -29,7 +29,7 @@ pub async fn handler(
 
     if !is_valid_identifier(&table_name) {
         return Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::BAD_REQUEST,
             "Invalid table name",
             &json!(null),
@@ -39,7 +39,7 @@ pub async fn handler(
     let tables = app_state.tables.read().await;
     if tables.contains_key(&table_name) {
         return Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::CONFLICT,
             "Conflict",
             &json!(null),
@@ -50,7 +50,7 @@ pub async fn handler(
     app_state.create_table(&table_name).await?;
 
     Ok(build_response(
-        before,
+        before.elapsed(),
         StatusCode::CREATED,
         "Table created successfully",
         &json!(null),

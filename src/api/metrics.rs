@@ -34,14 +34,14 @@ pub async fn handler(
             .query_timeseries(&format!("t#{table_name}"), None)?;
 
         Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::OK,
             "Metrics query successful",
             &json!(rows),
         ))
     } else {
         Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::CONFLICT,
             "Table not found",
             &json!(null),

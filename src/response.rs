@@ -1,15 +1,15 @@
 use crate::api::format_server_header;
 use actix_web::{http::StatusCode, HttpResponse};
 use serde_json::{json, Value};
-use std::time::Instant;
+use std::time::Duration;
 
 pub fn build_response(
-    before: Instant,
+    dur: Duration,
     status: StatusCode,
     message: &str,
     result: &Value,
 ) -> HttpResponse {
-    let time_ms = before.elapsed().as_millis();
+    let time_ms = dur.as_millis();
 
     let body = json!({
         "time_ms": time_ms,

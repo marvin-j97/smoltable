@@ -45,6 +45,7 @@ impl Smoltable {
         let path = path.as_ref();
 
         let tree = lsm_tree::Config::new(path)
+            .fsync_ms(None)
             .level_count(4)
             .compaction_strategy(Arc::new(lsm_tree::compaction::Levelled {
                 target_size: 64 * 1_024 * 1_024,
@@ -62,24 +63,47 @@ impl Smoltable {
         Ok(Self { tree })
     }
 
+    // TODO: need to deduplicate items with same row key
+    pub fn len(&self) -> lsm_tree::Result<usize> {
+        use std::ops::Bound::{Excluded, Unbounded};
+
+        let snapshot = self.tree.snapshot();
+
+        let mut count = 0;
+
+        let mut range: (Bound<Vec<u8>>, Bound<Vec<u8>>) = (Unbounded, Unbounded);
+
+        loop {
+            let chunk = snapshot
+                .range(range.clone())
+                .into_iter()
+                .take(10_000)
+                .collect::<lsm_tree::Result<Vec<_>>>()?;
+
+            if chunk.is_empty() {
+                break;
+            }
+
+            count += chunk.len();
+
+            let (key, _) = chunk.last().unwrap();
+            range = (Excluded(key.to_vec()), Unbounded);
+        }
+
+        Ok(count)
+    }
+
     pub fn delete_cells(&self, key: &str) -> lsm_tree::Result<u64> {
         use std::ops::Bound::{Excluded, Included, Unbounded};
 
-        let prefix_key = format!("{}:", key);
+        let prefix_key = key;
         let mut count = 0;
 
-        let Some(first_item) = self
-            .tree
-            .prefix(prefix_key.clone())
-            .into_iter()
-            .next()
-            .transpose()?
-        else {
+        let Some((first_key, _)) = self.tree.first_key_value()? else {
             return Ok(count);
         };
 
-        let mut range: (Bound<Vec<u8>>, Bound<Vec<u8>>) =
-            (Included(first_item.0.to_vec()), Unbounded);
+        let mut range: (Bound<Vec<u8>>, Bound<Vec<u8>>) = (Included(first_key.to_vec()), Unbounded);
 
         loop {
             let chunk = self
@@ -110,6 +134,7 @@ impl Smoltable {
         Ok(count)
     }
 
+    // TODO: use non-locking (chunked) iterator
     pub fn query(&self, input: &QueryInput) -> lsm_tree::Result<QueryOutput> {
         let key = input.row_key.as_bytes();
 

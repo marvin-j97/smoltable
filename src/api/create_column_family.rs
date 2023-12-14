@@ -28,7 +28,7 @@ pub async fn handler(
 
     if !is_valid_identifier(&cf_name) {
         return Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::BAD_REQUEST,
             "Invalid column family name",
             &json!(null),
@@ -40,7 +40,7 @@ pub async fn handler(
         .column_family_exists(&table_name, &cf_name)?
     {
         return Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::CONFLICT,
             "Conflict",
             &json!(null),
@@ -59,7 +59,7 @@ pub async fn handler(
     // stop on delete table
 
     Ok(build_response(
-        before,
+        before.elapsed(),
         StatusCode::CREATED,
         "Column family created successfully",
         &json!(null),

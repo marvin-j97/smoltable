@@ -39,12 +39,16 @@ fn recover_tables(manifest_table: &ManifestTable) -> lsm_tree::Result<HashMap<St
 
     let mut tables = HashMap::default();
 
-    for table_name in manifest_table.get_user_table_names()? {
+    for table_name in manifest_table
+        .get_user_table_names()?
+        .into_iter()
+        .filter(|x| !x.starts_with('_'))
+    {
         log::debug!("Recovering user table {table_name}");
 
         let recovered_table = Smoltable::new(
             data_folder().join("tables").join(&table_name),
-            manifest_table.config().block_cache.clone(),
+            manifest_table.tree.config().block_cache.clone(),
         )?;
         tables.insert(table_name, recovered_table);
     }
@@ -60,6 +64,10 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
     let disk_usage = data.metrics_table.query_timeseries(
         "t#",
         Some(ColumnKey::try_from("stats:").expect("should be valid column key")),
+    )?;
+    let latency = data.metrics_table.query_timeseries(
+        "t#",
+        Some(ColumnKey::try_from("lat:").expect("should be valid column key")),
     )?;
 
     let html = if cfg!(debug_assertions) {
@@ -77,6 +85,10 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
         .replace(
             "{{disk_usage}}",
             &serde_json::to_string(&disk_usage).expect("should serialize"),
+        )
+        .replace(
+            "{{latency}}",
+            &serde_json::to_string(&latency).expect("should serialize"),
         );
 
     Ok(HttpResponse::Ok()
@@ -98,25 +110,70 @@ async fn main() -> lsm_tree::Result<()> {
     let manifest_table = ManifestTable::open(block_cache.clone())?;
     let mut tables = recover_tables(&manifest_table)?;
 
-    let metrics_table = if let Some(table) = tables.get("_metrics") {
-        MetricsTable::from_table(table.clone())
-    } else {
+    let metrics_table = {
+        let existed_before = !data_folder().join("tables").join("_metrics").exists();
+
         let table = MetricsTable::create_new(block_cache)?;
         tables.insert("_metrics".into(), table.deref().clone());
-        manifest_table.persist_user_table("_metrics")?;
-        manifest_table.persist_column_family(
-            "_metrics",
-            &ColumnFamilyDefinition {
-                name: "stats".into(),
-                row_limit: None,
-            },
-        )?;
+
+        if !existed_before {
+            manifest_table.persist_user_table("_metrics")?;
+            manifest_table.persist_column_family(
+                "_metrics",
+                &ColumnFamilyDefinition {
+                    name: "stats".into(),
+                    row_limit: None,
+                },
+            )?;
+        }
 
         table
     };
 
     let manifest_table = Arc::new(manifest_table);
-    let tables = Arc::new(RwLock::new(recover_tables(&manifest_table)?));
+    let tables = Arc::new(RwLock::new(tables));
+
+    {
+        let metrics_table = metrics_table.clone();
+        let tables = tables.clone();
+
+        log::debug!("Starting table size counting worker");
+
+        // Start counting worker
+        tokio::spawn(async move {
+            loop {
+                let tables = tables.read().await;
+
+                for (table_name, table) in tables.iter() {
+                    log::debug!("Counting {table_name}");
+
+                    if let Ok(count) = table.len() {
+                        TableWriter::write_raw(
+                            &metrics_table,
+                            &RowWriteItem {
+                                row_key: format!("t#{table_name}"),
+                                cells: vec![ColumnWriteItem {
+                                    column_key: ColumnKey::try_from("stats:len")
+                                        .expect("should be column key"),
+                                    timestamp: None,
+                                    value: table::cell::Value::F64(count as f64),
+                                }],
+                            },
+                        )
+                        .ok();
+                    }
+
+                    log::debug!("Counted {table_name}");
+                }
+
+                drop(tables);
+
+                metrics_table.tree.flush().unwrap();
+
+                tokio::time::sleep(Duration::from_secs(3_600)).await;
+            }
+        });
+    }
 
     {
         let metrics_table = metrics_table.clone();
@@ -166,7 +223,7 @@ async fn main() -> lsm_tree::Result<()> {
                             ],
                         },
                     )
-                    .expect("should write");
+                    .ok();
                 }
                 drop(tables);
 
@@ -190,7 +247,7 @@ async fn main() -> lsm_tree::Result<()> {
                         ],
                     },
                 )
-                .expect("should write");
+                .ok();
 
                 metrics_table.tree.flush().unwrap();
 

@@ -59,7 +59,7 @@ pub async fn handler(
                 log::error!("Write error: {write_error:#?}");
 
                 return Ok(build_response(
-                    before,
+                    before.elapsed(),
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Internal server error",
                     &json!(null),
@@ -69,13 +69,15 @@ pub async fn handler(
 
         writer.finalize()?;
 
+        let dur = before.elapsed();
+
         let cell_count = req_body
             .items
             .iter()
             .map(|row| row.cells.len() as u128)
             .sum::<u128>();
 
-        let micros_total = before.elapsed().as_micros();
+        let micros_total = dur.as_micros();
 
         let micros_per_item = if cell_count == 0 {
             None
@@ -90,14 +92,15 @@ pub async fn handler(
                 cells: vec![ColumnWriteItem {
                     column_key: ColumnKey::try_from("lat:w").expect("should be column key"),
                     timestamp: None,
-                    value: CellValue::U128(micros_total),
+                    value: CellValue::F64(micros_total as f64),
                 }],
             },
         )
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "IO error"))?;
+        .ok();
+        app_state.metrics_table.tree.flush().ok();
 
         Ok(build_response(
-            before,
+            dur,
             StatusCode::OK,
             "Data ingestion successful",
             &json!({
@@ -110,7 +113,7 @@ pub async fn handler(
         ))
     } else {
         Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::CONFLICT,
             "Table not found",
             &json!(null),

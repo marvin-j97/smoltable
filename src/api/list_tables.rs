@@ -44,7 +44,7 @@ pub async fn handler(app_state: web::Data<AppState>) -> CustomRouteResult<HttpRe
         .collect::<lsm_tree::Result<Vec<_>>>()?;
 
     Ok(build_response(
-        before,
+        before.elapsed(),
         StatusCode::OK,
         "Tables retrieved successfully",
         &json!({

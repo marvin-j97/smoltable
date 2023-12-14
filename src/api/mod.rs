@@ -20,7 +20,7 @@ pub fn format_server_header() -> String {
 
 pub fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
     Ok(build_response(
-        before,
+        before.elapsed(),
         StatusCode::BAD_REQUEST,
         msg,
         &json!(null),

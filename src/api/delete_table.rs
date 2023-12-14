@@ -25,7 +25,7 @@ pub async fn handler(
 
     if table_name.starts_with('_') {
         return Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::BAD_REQUEST,
             "Invalid table name",
             &json!(null),
@@ -34,7 +34,7 @@ pub async fn handler(
 
     if !is_valid_identifier(&table_name) {
         return Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::BAD_REQUEST,
             "Invalid table name",
             &json!(null),
@@ -49,7 +49,7 @@ pub async fn handler(
         let micros = before.elapsed().as_micros();
 
         Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::ACCEPTED,
             "Deletion completed successfully",
             &json!({
@@ -58,7 +58,7 @@ pub async fn handler(
         ))
     } else {
         Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::CONFLICT,
             "Table not found",
             &json!(null),

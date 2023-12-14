@@ -24,7 +24,7 @@ pub async fn handler(app_state: web::Data<AppState>) -> CustomRouteResult<HttpRe
     let system_metrics = app_state.metrics_table.query_timeseries("sys", None)?;
 
     Ok(build_response(
-        before,
+        before.elapsed(),
         StatusCode::OK,
         "System info retrieved successfully",
         &json!({

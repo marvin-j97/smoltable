@@ -11,7 +11,7 @@ pub struct AppState {
 impl AppState {
     pub async fn create_table(&self, table_name: &str) -> lsm_tree::Result<Smoltable> {
         let path = crate::data_folder().join("tables").join(table_name);
-        let table = Smoltable::new(path, self.manifest_table.config().block_cache.clone())?;
+        let table = Smoltable::new(path, self.manifest_table.tree.config().block_cache.clone())?;
 
         self.manifest_table.persist_user_table(table_name)?;
 
