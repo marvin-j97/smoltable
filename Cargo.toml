@@ -11,7 +11,7 @@ codegen-units = 1
 strip = "debuginfo"
 
 [dependencies]
-actix-web = "4.4.0"
+actix-web = "4.4.1"
 env_logger = "0.10.1"
 log = { version = "0.4.20", features = ["release_max_level_trace"] }
 serde = { version = "1.0.193", features = ["derive"] }
