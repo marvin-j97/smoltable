@@ -4,11 +4,10 @@ pub mod single_row_reader;
 pub mod writer;
 
 use self::{
-    cell::{Cell, Row, Value as CellValue},
-    reader::VisitedCell,
+    cell::{Cell, Row, Value as CellValue, VisitedCell},
     single_row_reader::{QueryRowInput, QueryRowInputRowOptions, SingleRowReader},
 };
-use crate::{column_key::ParsedColumnKey, table::single_row_reader::get_affected_locality_groups};
+use crate::{column_key::ColumnKey, table::single_row_reader::get_affected_locality_groups};
 use fjall::{Batch, Keyspace, PartitionHandle};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -119,30 +118,33 @@ impl std::ops::Deref for Smoltable {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum ColumnFilter {
     #[serde(rename = "key")]
-    Key(ParsedColumnKey),
+    Key(ColumnKey),
 
     #[serde(rename = "multi_key")]
-    Multi(Vec<ParsedColumnKey>),
+    Multi(Vec<ColumnKey>),
 
     #[serde(rename = "prefix")]
-    Prefix(ParsedColumnKey),
+    Prefix(ColumnKey),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryPrefixInputRowOptions {
     pub limit: Option<u16>,
+    pub cell_limit: Option<u16>,
+    pub sample: Option<f32>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(transparent)]
 pub struct QueryPrefixInputColumnOptions {
+    pub cell_limit: Option<u16>,
+
     #[serde(flatten)]
     pub filter: Option<ColumnFilter>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryPrefixInputCellOptions {
-    pub limit: Option<u16>,
+    pub limit: Option<u32>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -345,6 +347,7 @@ impl Smoltable {
         Ok((row_count, cell_count))
     }
 
+    // TODO: allow deleting specific columns -> DeleteRowInput, also batch + limit it?
     pub fn delete_row(&self, row_key: String) -> fjall::Result<u64> {
         let mut count = 0;
 
@@ -354,7 +357,6 @@ impl Smoltable {
             QueryRowInput {
                 row: QueryRowInputRowOptions { key: row_key },
                 column: None,
-                cell: None,
             },
         )?;
 
@@ -392,85 +394,152 @@ impl Smoltable {
         })
     }
 
-    // TODO: need a PrefixReader... for delete and count
+    // TODO: need a PrefixReader... for count
 
     pub fn query_prefix(&self, input: QueryPrefixInput) -> fjall::Result<QueryOutput> {
+        use reader::Reader as TableReader;
+
         let column_filter = &input.column.as_ref().and_then(|x| x.filter.clone());
         let row_limit = input.row.as_ref().and_then(|x| x.limit).unwrap_or(u16::MAX) as usize;
-        let cell_limit = input
+
+        let column_cell_limit = input
+            .column
+            .as_ref()
+            .and_then(|x| x.cell_limit)
+            .unwrap_or(u16::MAX) as usize;
+
+        let row_cell_limit = input
+            .row
+            .as_ref()
+            .and_then(|x| x.cell_limit)
+            .unwrap_or(u16::MAX) as usize;
+
+        let global_cell_limit = input
             .cell
             .as_ref()
             .and_then(|x| x.limit)
-            .unwrap_or(u16::MAX) as usize;
+            .unwrap_or(u32::from(u16::MAX)) as usize;
 
-        let locality_groups_to_scan = get_affected_locality_groups(self, &column_filter)?;
+        let locality_groups_to_scan = get_affected_locality_groups(self, column_filter)?;
         let instant = self.keyspace.instant();
 
         let mut rows_scanned_count = 0;
         let mut cells_scanned_count = 0;
         let mut bytes_scanned_count = 0;
+        let mut cell_count = 0; // Cell count over all aggregated rows
 
         let mut rows: BTreeMap<String, Row> = BTreeMap::new();
 
-        // TODO: only prefix over default partition, then collect columns from other locality groups if needed per row
-        // TODO: depending on column filter...
+        let mut readers = locality_groups_to_scan
+            .into_iter()
+            .map(|x| TableReader::new(instant, x, input.prefix.clone()))
+            .collect::<Vec<_>>();
 
-        'outer: for locality_group in locality_groups_to_scan {
-            let mut reader = reader::Reader::new(instant, locality_group, input.prefix.clone());
+        let mut row_sample_counter = 1.0_f32;
 
-            for cell in &mut reader {
-                let cell = cell?;
+        loop {
+            // We are gonna visit another cell, if the global cell limit is reached
+            // we can short circuit out of the loop
+            if cell_count >= global_cell_limit {
+                break;
+            }
 
-                if let Some(filter) = column_filter {
-                    if !satisfies_column_filter(&cell, filter) {
-                        continue;
-                    }
-                }
+            // Peek all readers
+            let cells = readers
+                .iter_mut()
+                .map(TableReader::peek)
+                .collect::<Vec<_>>();
 
-                let current_row = rows.entry(cell.row_key).or_insert_with_key(|key| Row {
-                    row_key: key.clone(),
-                    columns: HashMap::default(),
-                });
+            // Throw if error
+            let cells = cells
+                .into_iter()
+                .map(Option::transpose)
+                .collect::<fjall::Result<Vec<Option<VisitedCell>>>>()?;
 
-                // TODO: need to take into account:
-                // TODO: if a row has no matching columns, it should not be taken into
-                // TODO: account for row limit
+            // Get index of reader that has lowest row
+            let lowest_idx = cells
+                .into_iter()
+                .enumerate()
+                .filter(|(_, cell)| Option::is_some(cell))
+                .map(|(idx, cell)| (idx, cell.unwrap()))
+                .max_by(|(_, a), (_, b)| a.raw_key.cmp(&b.raw_key));
 
-                // Append cell
-                let version_history = current_row
-                    .columns
-                    .entry(cell.column_key.family)
-                    .or_default()
-                    .entry(cell.column_key.qualifier.unwrap_or(String::from("_")))
-                    .or_default();
+            let Some((lowest_idx, _)) = lowest_idx else {
+                // No more items
+                break;
+            };
 
-                if version_history.len() < cell_limit {
-                    version_history.push(Cell {
-                        timestamp: cell.timestamp,
-                        value: cell.value,
-                    });
-                }
+            // Consume from iterator with lowest item
+            let cell = readers
+                .get_mut(lowest_idx)
+                .unwrap()
+                .next()
+                .transpose()?
+                .unwrap();
 
-                if version_history.len() >= cell_limit {
-                    break;
-                }
-
-                if rows.len() >= row_limit {
-                    break 'outer;
+            if let Some(filter) = column_filter {
+                if !satisfies_column_filter(&cell, filter) {
+                    continue;
                 }
             }
 
+            if !rows.contains_key(&cell.row_key) {
+                // We are visiting a new row
+                rows_scanned_count += 1;
+
+                rows.retain(|_, row| row.column_count() > 0);
+
+                // If the row limit is reached
+                // we can short circuit out of the loop
+                if rows.len() == row_limit {
+                    break;
+                }
+
+                if let Some(sample_rate) = input.row.as_ref().and_then(|x| x.sample) {
+                    if sample_rate < 1.0 {
+                        row_sample_counter += sample_rate;
+
+                        if row_sample_counter < 1.0 {
+                            continue;
+                        } else {
+                            row_sample_counter -= 1.0;
+                        }
+                    }
+                }
+            }
+
+            let row = rows.entry(cell.row_key).or_insert_with_key(|key| Row {
+                row_key: key.clone(),
+                columns: HashMap::default(),
+            });
+
+            if row.cell_count() >= row_cell_limit {
+                continue;
+            }
+
+            let version_history = row
+                .columns
+                .entry(cell.column_key.family)
+                .or_default()
+                .entry(cell.column_key.qualifier.unwrap_or(String::from("")))
+                .or_default();
+
+            if version_history.len() >= column_cell_limit {
+                continue;
+            }
+
+            version_history.push(Cell {
+                timestamp: cell.timestamp,
+                value: cell.value,
+            });
+
+            cell_count += 1;
+        }
+
+        for reader in readers {
             cells_scanned_count += reader.cells_scanned_count;
             bytes_scanned_count += reader.bytes_scanned_count;
         }
-
-        // TODO: rows limit doesn't really work because table is sparse...? how to get the "correct" rows...?????????
-        // TODO: row limit short circuits too early
-        // TODO: ... if row limit is full after locality group
-        // TODO: but there are more locality groups, query those still, but only with the rows that we want
-        // TODO: so remaining columns can be gathered
-
-        // TODO: fix rows scanned count... not trivial??? need to keep track of EVERY row ID...
 
         Ok(QueryOutput {
             rows: rows.into_values().collect(),
@@ -502,10 +571,10 @@ impl Smoltable {
     }
 
     pub fn query_row(&self, input: QueryRowInput) -> fjall::Result<QueryRowOutput> {
-        let cell_limit: usize = input
-            .cell
+        let column_cell_limit: usize = input
+            .column
             .as_ref()
-            .and_then(|x| x.limit)
+            .and_then(|x| x.cell_limit)
             .unwrap_or(u16::MAX)
             .into();
 
@@ -524,7 +593,7 @@ impl Smoltable {
                 .entry(cell.column_key.qualifier.unwrap_or(String::from("_")))
                 .or_default();
 
-            if version_history.len() < cell_limit {
+            if version_history.len() < column_cell_limit {
                 version_history.push(Cell {
                     timestamp: cell.timestamp,
                     value: cell.value,
@@ -607,7 +676,7 @@ mod tests {
     };
     use super::writer::Writer as TableWriter;
     use super::*;
-    use crate::column_key::ParsedColumnKey;
+    use crate::column_key::ColumnKey;
     use test_log::test;
 
     #[test]
@@ -634,8 +703,7 @@ mod tests {
         writer.write(&writer::RowWriteItem {
             row_key: "test".to_owned(),
             cells: vec![writer::ColumnWriteItem {
-                column_key: ParsedColumnKey::try_from("value:")
-                    .expect("should be valid column key"),
+                column_key: ColumnKey::try_from("value:").expect("should be valid column key"),
                 timestamp: Some(0),
                 value: CellValue::String("hello".to_owned()),
             }],
@@ -644,7 +712,7 @@ mod tests {
         writer.finalize()?;
 
         let query_result = table.query_row(QueryRowInput {
-            cell: None,
+            // cell: None,
             column: None,
             row: QueryRowInputRowOptions {
                 key: "test".to_owned(),
@@ -706,13 +774,12 @@ mod tests {
             row_key: "test".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
+                    column_key: ColumnKey::try_from("value:").expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello".to_owned()),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("another:")
+                    column_key: ColumnKey::try_from("another:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello2".to_owned()),
@@ -723,7 +790,7 @@ mod tests {
         writer.finalize()?;
 
         let query_result = table.query_row(QueryRowInput {
-            cell: None,
+            // cell: None,
             column: None,
             row: QueryRowInputRowOptions {
                 key: "test".to_owned(),
@@ -795,13 +862,12 @@ mod tests {
             row_key: "test".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
+                    column_key: ColumnKey::try_from("value:").expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello".to_owned()),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("another:")
+                    column_key: ColumnKey::try_from("another:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello2".to_owned()),
@@ -812,11 +878,10 @@ mod tests {
         writer.finalize()?;
 
         let query_result = table.query_row(QueryRowInput {
-            cell: None,
+            // cell: None,
             column: Some(QueryRowInputColumnOptions {
-                filter: Some(ColumnFilter::Key(
-                    ParsedColumnKey::try_from("value:").unwrap(),
-                )),
+                filter: Some(ColumnFilter::Key(ColumnKey::try_from("value:").unwrap())),
+                cell_limit: None,
             }),
             row: QueryRowInputRowOptions {
                 key: "test".to_owned(),
@@ -882,19 +947,18 @@ mod tests {
             row_key: "test".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
+                    column_key: ColumnKey::try_from("value:").expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello".to_owned()),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("another:")
+                    column_key: ColumnKey::try_from("another:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello2".to_owned()),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("another_one:")
+                    column_key: ColumnKey::try_from("another_one:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello3".to_owned()),
@@ -905,12 +969,13 @@ mod tests {
         writer.finalize()?;
 
         let query_result = table.query_row(QueryRowInput {
-            cell: None,
+            //  cell: None,
             column: Some(QueryRowInputColumnOptions {
                 filter: Some(ColumnFilter::Multi(vec![
-                    ParsedColumnKey::try_from("value:").unwrap(),
-                    ParsedColumnKey::try_from("another_one:").unwrap(),
+                    ColumnKey::try_from("value:").unwrap(),
+                    ColumnKey::try_from("another_one:").unwrap(),
                 ])),
+                cell_limit: None,
             }),
             row: QueryRowInputRowOptions {
                 key: "test".to_owned(),
@@ -983,13 +1048,12 @@ mod tests {
             row_key: "test".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
+                    column_key: ColumnKey::try_from("value:").expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello".to_owned()),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("another:")
+                    column_key: ColumnKey::try_from("another:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello2".to_owned()),
@@ -1000,7 +1064,7 @@ mod tests {
         writer.finalize()?;
 
         let query_result = table.query_row(QueryRowInput {
-            cell: None,
+            //  cell: None,
             column: None,
             row: QueryRowInputRowOptions {
                 key: "test".to_owned(),
@@ -1074,13 +1138,12 @@ mod tests {
             row_key: "test".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
+                    column_key: ColumnKey::try_from("value:").expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello".to_owned()),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("another:")
+                    column_key: ColumnKey::try_from("another:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello2".to_owned()),
@@ -1091,11 +1154,10 @@ mod tests {
         writer.finalize()?;
 
         let query_result = table.query_row(QueryRowInput {
-            cell: None,
+            // cell: None,
             column: Some(QueryRowInputColumnOptions {
-                filter: Some(ColumnFilter::Key(
-                    ParsedColumnKey::try_from("value:").unwrap(),
-                )),
+                filter: Some(ColumnFilter::Key(ColumnKey::try_from("value:").unwrap())),
+                cell_limit: None,
             }),
             row: QueryRowInputRowOptions {
                 key: "test".to_owned(),
@@ -1124,11 +1186,10 @@ mod tests {
         );
 
         let query_result = table.query_row(QueryRowInput {
-            cell: None,
+            //  cell: None,
             column: Some(QueryRowInputColumnOptions {
-                filter: Some(ColumnFilter::Key(
-                    ParsedColumnKey::try_from("another:").unwrap(),
-                )),
+                filter: Some(ColumnFilter::Key(ColumnKey::try_from("another:").unwrap())),
+                cell_limit: None,
             }),
             row: QueryRowInputRowOptions {
                 key: "test".to_owned(),
@@ -1199,19 +1260,18 @@ mod tests {
             row_key: "test".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
+                    column_key: ColumnKey::try_from("value:").expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello".to_owned()),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("another:")
+                    column_key: ColumnKey::try_from("another:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello2".to_owned()),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("another_one:")
+                    column_key: ColumnKey::try_from("another_one:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::String("hello3".to_owned()),
@@ -1222,12 +1282,13 @@ mod tests {
         writer.finalize()?;
 
         let query_result = table.query_row(QueryRowInput {
-            cell: None,
+            // cell: None,
             column: Some(QueryRowInputColumnOptions {
-                filter: Some(ColumnFilter::Multi(vec![ParsedColumnKey::try_from(
+                filter: Some(ColumnFilter::Multi(vec![ColumnKey::try_from(
                     "another_one:",
                 )
                 .unwrap()])),
+                cell_limit: None,
             }),
             row: QueryRowInputRowOptions {
                 key: "test".to_owned(),
@@ -1256,11 +1317,10 @@ mod tests {
         );
 
         let query_result = table.query_row(QueryRowInput {
-            cell: None,
+            // cell: None,
             column: Some(QueryRowInputColumnOptions {
-                filter: Some(ColumnFilter::Key(
-                    ParsedColumnKey::try_from("another:").unwrap(),
-                )),
+                filter: Some(ColumnFilter::Key(ColumnKey::try_from("another:").unwrap())),
+                cell_limit: None,
             }),
             row: QueryRowInputRowOptions {
                 key: "test".to_owned(),
@@ -1317,7 +1377,7 @@ mod tests {
         writer.write(&writer::RowWriteItem {
             row_key: "item#1".to_owned(),
             cells: vec![writer::ColumnWriteItem {
-                column_key: ParsedColumnKey::try_from("value:")
+                column_key: ColumnKey::try_from("value:")
                     .expect("should be valid column key"),
                 timestamp: Some(0),
                 value: CellValue::U8(1),
@@ -1326,7 +1386,7 @@ mod tests {
         writer.write(&writer::RowWriteItem {
             row_key: "item#2".to_owned(),
             cells: vec![writer::ColumnWriteItem {
-                column_key: ParsedColumnKey::try_from("value:")
+                column_key: ColumnKey::try_from("value:")
                     .expect("should be valid column key"),
                 timestamp: Some(0),
                 value: CellValue::U8(2),
@@ -1335,7 +1395,7 @@ mod tests {
         writer.write(&writer::RowWriteItem {
             row_key: "item#3".to_owned(),
             cells: vec![writer::ColumnWriteItem {
-                column_key: ParsedColumnKey::try_from("value:")
+                column_key: ColumnKey::try_from("value:")
                     .expect("should be valid column key"),
                 timestamp: Some(0),
                 value: CellValue::U8(3),
@@ -1434,7 +1494,7 @@ mod tests {
         writer.write(&writer::RowWriteItem {
             row_key: "item#1".to_owned(),
             cells: vec![writer::ColumnWriteItem {
-                column_key: ParsedColumnKey::try_from("value:")
+                column_key: ColumnKey::try_from("value:")
                     .expect("should be valid column key"),
                 timestamp: Some(0),
                 value: CellValue::U8(1),
@@ -1443,7 +1503,7 @@ mod tests {
         writer.write(&writer::RowWriteItem {
             row_key: "item#2".to_owned(),
             cells: vec![writer::ColumnWriteItem {
-                column_key: ParsedColumnKey::try_from("value:")
+                column_key: ColumnKey::try_from("value:")
                     .expect("should be valid column key"),
                 timestamp: Some(0),
                 value: CellValue::U8(2),
@@ -1452,7 +1512,7 @@ mod tests {
         writer.write(&writer::RowWriteItem {
             row_key: "item#3".to_owned(),
             cells: vec![writer::ColumnWriteItem {
-                column_key: ParsedColumnKey::try_from("value:")
+                column_key: ColumnKey::try_from("value:")
                     .expect("should be valid column key"),
                 timestamp: Some(0),
                 value: CellValue::U8(3),
@@ -1525,13 +1585,13 @@ mod tests {
             row_key: "item#1".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
+                    column_key: ColumnKey::try_from("value:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(1),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("other:asd")
+                    column_key: ColumnKey::try_from("other:asd")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(44),
@@ -1542,13 +1602,13 @@ mod tests {
             row_key: "item#2".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
+                    column_key: ColumnKey::try_from("value:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(2),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("other:asd")
+                    column_key: ColumnKey::try_from("other:asd")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(45),
@@ -1559,13 +1619,13 @@ mod tests {
             row_key: "item#3".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
+                    column_key: ColumnKey::try_from("value:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(3),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("other:asd")
+                    column_key: ColumnKey::try_from("other:asd")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(46),
@@ -1579,7 +1639,7 @@ mod tests {
             cell_limit: None,
             row_limit: None,
             column_filter: Some(
-                ParsedColumnKey::try_from("other:").expect("should be valid column key"),
+                ColumnKey::try_from("other:").expect("should be valid column key"),
             ),
             row_key: "item#".to_owned(),
         })?;
@@ -1639,7 +1699,7 @@ mod tests {
             cell_limit: None,
             row_limit: None,
             column_filter: Some(
-                ParsedColumnKey::try_from("other:asd").expect("should be valid column key"),
+                ColumnKey::try_from("other:asd").expect("should be valid column key"),
             ),
             row_key: "item#".to_owned(),
         })?;
@@ -1729,13 +1789,13 @@ mod tests {
             row_key: "item#1".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
+                    column_key: ColumnKey::try_from("value:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(1),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("other:asd")
+                    column_key: ColumnKey::try_from("other:asd")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(44),
@@ -1746,13 +1806,13 @@ mod tests {
             row_key: "item#2".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
+                    column_key: ColumnKey::try_from("value:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(2),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("other:asd")
+                    column_key: ColumnKey::try_from("other:asd")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(45),
@@ -1763,13 +1823,13 @@ mod tests {
             row_key: "item#3".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
+                    column_key: ColumnKey::try_from("value:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(3),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("other:asd")
+                    column_key: ColumnKey::try_from("other:asd")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(46),
@@ -1906,13 +1966,13 @@ mod tests {
             row_key: "item#1".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
+                    column_key: ColumnKey::try_from("value:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(1),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("other:asd")
+                    column_key: ColumnKey::try_from("other:asd")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(44),
@@ -1923,13 +1983,13 @@ mod tests {
             row_key: "item#2".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
+                    column_key: ColumnKey::try_from("value:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(2),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("other:asd")
+                    column_key: ColumnKey::try_from("other:asd")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(45),
@@ -1940,13 +2000,13 @@ mod tests {
             row_key: "item#3".to_owned(),
             cells: vec![
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("value:")
+                    column_key: ColumnKey::try_from("value:")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(3),
                 },
                 writer::ColumnWriteItem {
-                    column_key: ParsedColumnKey::try_from("other:asd")
+                    column_key: ColumnKey::try_from("other:asd")
                         .expect("should be valid column key"),
                     timestamp: Some(0),
                     value: CellValue::U8(46),

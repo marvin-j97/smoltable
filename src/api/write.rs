@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use super::bad_request;
 use crate::app_state::AppState;
 use crate::column_key::ColumnKey;
@@ -16,6 +14,7 @@ use actix_web::{
 };
 use serde::Deserialize;
 use serde_json::json;
+use std::ops::Deref;
 
 #[derive(Debug, Deserialize)]
 pub struct Input {

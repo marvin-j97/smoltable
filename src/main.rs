@@ -21,10 +21,7 @@ use metrics::MetricsTable;
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use sysinfo::SystemExt;
 use table::{
-    single_row_reader::{
-        QueryRowInput, QueryRowInputCellOptions, QueryRowInputColumnOptions,
-        QueryRowInputRowOptions,
-    },
+    single_row_reader::{QueryRowInput, QueryRowInputColumnOptions, QueryRowInputRowOptions},
     writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter},
     ColumnFamilyDefinition, CreateColumnFamilyInput, Smoltable,
 };
@@ -63,13 +60,12 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
 
     let system_metrics = data.metrics_table.multi_get(vec![QueryRowInput {
         row: QueryRowInputRowOptions { key: "sys".into() },
-        cell: Some(QueryRowInputCellOptions {
-            limit: Some(1_440 / 2),
-        }),
+        // cell: None,
         column: Some(QueryRowInputColumnOptions {
             filter: Some(table::ColumnFilter::Key(
                 ColumnKey::try_from("stats:").expect("should be valid column key"),
             )),
+            cell_limit: Some(1_440 / 2),
         }),
     }])?;
 
@@ -89,13 +85,12 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                     row: QueryRowInputRowOptions {
                         key: name.to_owned(),
                     },
-                    cell: Some(QueryRowInputCellOptions {
-                        limit: Some(/* 12 hours */ 1_440 / 2),
-                    }), // TODO: use timestamp gt filter instead of cell_limit
+                    // cell: None,
                     column: Some(QueryRowInputColumnOptions {
                         filter: Some(table::ColumnFilter::Key(
                             ColumnKey::try_from("stats:").expect("should be valid column key"),
                         )),
+                        cell_limit: Some(1_440 / 2),
                     }),
                 }
             })
@@ -110,13 +105,12 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                     row: QueryRowInputRowOptions {
                         key: name.to_owned(),
                     },
-                    cell: Some(QueryRowInputCellOptions {
-                        limit: Some(/* 12 hours */ 1_440 / 2),
-                    }), // TODO: use timestamp gt filter instead of cell_limit
+                    // cell: NOne
                     column: Some(QueryRowInputColumnOptions {
                         filter: Some(table::ColumnFilter::Key(
                             ColumnKey::try_from("lat:").expect("should be valid column key"),
                         )),
+                        cell_limit: Some(1_440 / 2),
                     }),
                 }
             })

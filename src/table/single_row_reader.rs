@@ -1,6 +1,6 @@
 use super::{
-    reader::{Reader as TableReader, VisitedCell},
-    satisfies_column_filter, ColumnFilter, Smoltable,
+    cell::VisitedCell, reader::Reader as TableReader, satisfies_column_filter, ColumnFilter,
+    Smoltable,
 };
 use fjall::PartitionHandle;
 use serde::{Deserialize, Serialize};
@@ -8,25 +8,27 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryRowInputRowOptions {
     pub key: String,
+    // TODO: cell_limit
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(transparent)]
 pub struct QueryRowInputColumnOptions {
+    pub cell_limit: Option<u16>,
+
     #[serde(flatten)]
     pub filter: Option<ColumnFilter>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/* #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryRowInputCellOptions {
     pub limit: Option<u16>,
-}
+} */
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryRowInput {
     pub row: QueryRowInputRowOptions,
     pub column: Option<QueryRowInputColumnOptions>,
-    pub cell: Option<QueryRowInputCellOptions>,
+    // pub cell: Option<QueryRowInputCellOptions>,
 }
 
 pub fn get_affected_locality_groups(
@@ -42,24 +44,25 @@ pub fn get_affected_locality_groups(
 
                 let column_family_name = &key.family;
 
-                let filtered_groups = lock
-                    .iter()
-                    .filter(|x| x.contains_column_family(column_family_name))
-                    .map(|lg| lg.tree.clone());
-
-                locality_groups.extend(filtered_groups);
-
                 if table
                     .column_families_that_are_in_default_locality_group()?
                     .contains(column_family_name)
                 {
                     locality_groups.push(table.tree.clone());
+                } else {
+                    let filtered_groups = lock
+                        .iter()
+                        .filter(|x| x.contains_column_family(column_family_name))
+                        .map(|lg| lg.tree.clone());
+
+                    locality_groups.extend(filtered_groups);
                 }
             }
             ColumnFilter::Multi(keys) => {
                 let lock = table.locality_groups.read().expect("lock is poisoned");
 
-                let column_family_names = keys.iter().map(|x| &x.family).collect::<Vec<_>>();
+                let mut column_family_names = keys.iter().map(|x| &x.family).collect::<Vec<_>>();
+                column_family_names.sort();
 
                 let filtered_groups = lock
                     .iter()
@@ -82,7 +85,7 @@ pub fn get_affected_locality_groups(
             }
         }
     } else {
-        // NOTE: Of course, also add the default locality group
+        // NOTE: Of course, add the default locality group
         locality_groups.push(table.tree.clone());
 
         // NOTE: Scan over all locality groups, because we have no column filter

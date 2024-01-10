@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::app_state::AppState;
 use crate::error::CustomRouteResult;
 use crate::response::build_response;
@@ -8,6 +6,7 @@ use actix_web::http::StatusCode;
 use actix_web::{get, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct CacheStats {
