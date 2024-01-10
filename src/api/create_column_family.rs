@@ -42,7 +42,22 @@ pub async fn handler(
     let tables = app_state.tables.write().await;
 
     if let Some(table) = tables.get(&table_name) {
-        // TODO: validate -> 409
+        let existing_families = table
+            .list_column_families()?
+            .into_iter()
+            .map(|x| x.name)
+            .collect::<Vec<_>>();
+
+        for family in req_body.column_families.iter().map(|x| x.name.clone()) {
+            if existing_families.contains(&family) {
+                return Ok(build_response(
+                    before.elapsed(),
+                    StatusCode::CONFLICT,
+                    &format!("Column family {family} already exists"),
+                    &json!(null),
+                ));
+            }
+        }
 
         table.create_column_families(&req_body.0)?;
 

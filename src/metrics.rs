@@ -1,8 +1,6 @@
-use crate::{
-    column_key::ColumnKey,
-    table::{cell::Row, Smoltable},
-};
+use crate::{env::metrics_cap_mb, table::Smoltable};
 use fjall::Keyspace;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct MetricsTable(Smoltable);
@@ -20,23 +18,14 @@ impl std::ops::Deref for MetricsTable {
 
 impl MetricsTable {
     pub async fn create_new(keyspace: Keyspace) -> fjall::Result<Self> {
-        /* let max_mb = u64::from(metrics_cap_mb());
+        let max_mb = u64::from(metrics_cap_mb());
 
-        let tree = keyspace.open_partition(
-            "_metrics",
-            fjall::PartitionCreateOptions::default()
-                .level_count(7)
-                .block_size(/* 32 MiB */ 32 * 1_024 * 1_024),
-        )?;
-
-        tree.set_compaction_strategy(Arc::new(fjall::compaction::Fifo::new(
-            /* N MiB */ max_mb * 1_000 * 1_000,
-        )));
-
-        log::info!("Recovered metrics table"); */
-
-        // TODO: Smoltable::with_tree
         let table = Self(Smoltable::open("_metrics", keyspace)?);
+        table
+            .tree
+            .set_compaction_strategy(Arc::new(fjall::compaction::Fifo::new(
+                /* N MiB */ max_mb * 1_000 * 1_000,
+            )));
 
         Ok(table)
     }

@@ -10,6 +10,7 @@ env:
 
 jobs:
   test_stable:
+    cancel-timeout-minutes: 20
     strategy:
       matrix:
         rust_version:

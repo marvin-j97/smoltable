@@ -67,11 +67,9 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
             limit: Some(1_440 / 2),
         }),
         column: Some(QueryRowInputColumnOptions {
-            filter: Some(table::ColumnFilter::Multi(vec![
-                ParsedColumnKey::try_from("stats:cpu").unwrap(),
-                ParsedColumnKey::try_from("stats:mem").unwrap(),
-                ParsedColumnKey::try_from("stats:wal_cnt").unwrap(),
-            ])),
+            filter: Some(table::ColumnFilter::Key(
+                ColumnKey::try_from("stats:").expect("should be valid column key"),
+            )),
         }),
     }])?;
 
@@ -308,7 +306,7 @@ async fn main() -> fjall::Result<()> {
                                     value: table::cell::Value::F64(segment_count as f64),
                                 },
                                 ColumnWriteItem {
-                                    column_key: ColumnKey::try_from("stats:du")
+                                    column_key: ColumnKey::try_from("stats:du") // TODO: DU is broken, need to scan all locality groups + meta partitions
                                         .expect("should be column key"),
                                     timestamp: None,
                                     value: table::cell::Value::F64(folder_size as f64),

@@ -379,7 +379,9 @@ impl Smoltable {
 
         for cell in &mut reader {
             let cell = cell?;
-            self.tree.remove(cell.raw_key)?;
+            self.tree.remove(&cell.raw_key)?;
+
+            log::trace!("Deleted cell {:?}", cell.raw_key);
             count += 1;
         }
 
@@ -429,7 +431,7 @@ impl Smoltable {
 
         let mut rows: BTreeMap<String, Row> = BTreeMap::new();
 
-        for locality_group in locality_groups_to_scan {
+        'outer: for locality_group in locality_groups_to_scan {
             let mut reader = reader::Reader::new(instant, locality_group, input.prefix.clone());
 
             for cell in &mut reader {
@@ -461,14 +463,24 @@ impl Smoltable {
                     });
                 }
 
-                if version_history.len() >= cell_limit && rows.len() > (row_limit - 1) {
+                if version_history.len() >= cell_limit {
                     break;
+                }
+
+                if rows.len() >= row_limit {
+                    break 'outer;
                 }
             }
 
             cells_scanned_count += reader.cells_scanned_count;
             bytes_scanned_count += reader.bytes_scanned_count;
         }
+
+        // TODO: rows limit doesn't really work because table is sparse...? how to get the "correct" rows...?????????
+        // TODO: row limit short circuits too early
+        // TODO: ... if row limit is full after locality group
+        // TODO: but there are more locality groups, query those still, but only with the rows that we want
+        // TODO: so remaining columns can be gathered
 
         // TODO: fix rows scanned count... not trivial??? need to keep track of EVERY row ID...
 
@@ -554,7 +566,21 @@ impl Smoltable {
     }
 
     pub fn disk_space_usage(&self) -> u64 {
-        self.tree.disk_space()
+        let mut bytes = self.tree.disk_space();
+
+        for lg_size in self
+            .locality_groups
+            .read()
+            .expect("lock is poisoned")
+            .iter()
+            .map(|x| x.tree.disk_space())
+        {
+            bytes += lg_size;
+        }
+
+        // TODO: add meta partitions sizes
+
+        bytes
     }
 
     pub fn cached_block_count(&self) -> usize {

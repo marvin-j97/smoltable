@@ -66,26 +66,29 @@ pub fn get_affected_locality_groups(
                     .filter(|x| x.contains_column_families(&column_family_names))
                     .map(|lg| lg.tree.clone());
 
-                locality_groups.extend(filtered_groups);
+                {
+                    let column_families_that_are_in_default_locality_group =
+                        table.column_families_that_are_in_default_locality_group()?;
 
-                let column_families_that_are_in_default_locality_group =
-                    table.column_families_that_are_in_default_locality_group()?;
-
-                if column_family_names.iter().any(|column_family_name| {
-                    column_families_that_are_in_default_locality_group.contains(column_family_name)
-                }) {
-                    locality_groups.push(table.tree.clone());
+                    if column_family_names.iter().any(|column_family_name| {
+                        column_families_that_are_in_default_locality_group
+                            .contains(column_family_name)
+                    }) {
+                        locality_groups.push(table.tree.clone());
+                    }
                 }
+
+                locality_groups.extend(filtered_groups);
             }
         }
     } else {
+        // NOTE: Of course, also add the default locality group
+        locality_groups.push(table.tree.clone());
+
         // NOTE: Scan over all locality groups, because we have no column filter
         let lock = table.locality_groups.read().expect("lock is poisoned");
         let all_groups = lock.iter().map(|lg| lg.tree.clone());
         locality_groups.extend(all_groups);
-
-        // NOTE: Of course, also add the default locality group
-        locality_groups.push(table.tree.clone());
     }
 
     Ok(locality_groups)
