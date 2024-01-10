@@ -147,7 +147,7 @@ pub struct QueryPrefixInputCellOptions {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryPrefixInput {
-    pub prefix: String,
+    pub prefix: String, // TODO: should be row.prefix
     pub column: Option<QueryPrefixInputColumnOptions>,
     pub row: Option<QueryPrefixInputRowOptions>,
     pub cell: Option<QueryPrefixInputCellOptions>,
@@ -233,7 +233,7 @@ impl Smoltable {
             .manifest
             .prefix("cf:")
             .into_iter()
-            .collect::<lsm_tree::Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>, fjall::LsmError>>()?;
 
         let items = items
             .into_iter()
@@ -251,7 +251,7 @@ impl Smoltable {
             .manifest
             .prefix("lg:")
             .into_iter()
-            .collect::<lsm_tree::Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>, fjall::LsmError>>()?;
 
         let items = items
             .into_iter()
@@ -327,39 +327,20 @@ impl Smoltable {
         // TODO: ideally, we should get counts per locality group
         // TODO: store in table-wide _metrics
 
-        /*  let mut reader = TableReader::new(
-            self.clone(),
-            reader::Input {
-                prefix: "".into(),
-                /*  cell_limit: None,
-                column_filter: None,
-                row_limit: None, */
-            },
-        );
+        let locality_groups_to_scan = get_affected_locality_groups(self, &None)?;
+        let instant = self.keyspace.instant();
 
-        let mut current_row: Row = Row {
-            row_key: "".into(),
-            columns: Default::default(),
-        };
+        // TODO: scan default partition and count rows (+ cells), then only count cells for other locality groups
 
-        for cell in &mut reader {
-            let cell = cell?;
-            cell_count += 1;
+        for locality_group in locality_groups_to_scan {
+            let mut reader =
+                reader::Reader::new(instant, locality_group, "".into()).chunk_size(10_000);
 
-            if current_row.row_key.is_empty() {
-                current_row.row_key = cell.row_key.clone();
+            for cell in &mut reader {
+                let _ = cell?;
+                cell_count += 1;
             }
-
-            if cell.row_key != current_row.row_key {
-                // Rotate over to new row
-                row_count += 1;
-
-                current_row = Row {
-                    row_key: cell.row_key.clone(),
-                    columns: HashMap::default(),
-                };
-            }
-        } */
+        }
 
         Ok((row_count, cell_count))
     }
@@ -431,6 +412,9 @@ impl Smoltable {
 
         let mut rows: BTreeMap<String, Row> = BTreeMap::new();
 
+        // TODO: only prefix over default partition, then collect columns from other locality groups if needed per row
+        // TODO: depending on column filter...
+
         'outer: for locality_group in locality_groups_to_scan {
             let mut reader = reader::Reader::new(instant, locality_group, input.prefix.clone());
 
@@ -447,6 +431,10 @@ impl Smoltable {
                     row_key: key.clone(),
                     columns: HashMap::default(),
                 });
+
+                // TODO: need to take into account:
+                // TODO: if a row has no matching columns, it should not be taken into
+                // TODO: account for row limit
 
                 // Append cell
                 let version_history = current_row
@@ -513,8 +501,6 @@ impl Smoltable {
         Ok(fams)
     }
 
-    // TODO: need a SingleRowReader that emits cells of a single row (QueryRowInput)
-
     pub fn query_row(&self, input: QueryRowInput) -> fjall::Result<QueryRowOutput> {
         let cell_limit: usize = input
             .cell
@@ -563,6 +549,24 @@ impl Smoltable {
 
     pub fn batch(&self) -> Batch {
         self.keyspace.batch()
+    }
+
+    pub fn segment_count(&self) -> usize {
+        let mut bytes = self.tree.segment_count();
+
+        for lg_size in self
+            .locality_groups
+            .read()
+            .expect("lock is poisoned")
+            .iter()
+            .map(|x| x.tree.segment_count())
+        {
+            bytes += lg_size;
+        }
+
+        // TODO: add meta partitions sizes
+
+        bytes
     }
 
     pub fn disk_space_usage(&self) -> u64 {

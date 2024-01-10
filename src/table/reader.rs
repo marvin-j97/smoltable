@@ -1,7 +1,6 @@
 use super::CellValue;
 use crate::column_key::ColumnKey;
-use fjall::PartitionHandle;
-use lsm_tree::{SeqNo, Snapshot};
+use fjall::{PartitionHandle, Snapshot};
 use std::{collections::VecDeque, ops::Bound, sync::Arc};
 
 #[derive(Debug)]
@@ -55,10 +54,12 @@ pub struct Reader {
 
     pub cells_scanned_count: u64,
     pub bytes_scanned_count: u64,
+
+    chunk_size: usize,
 }
 
 impl Reader {
-    pub fn new(instant: SeqNo, locality_group: PartitionHandle, prefix: String) -> Self {
+    pub fn new(instant: fjall::Instant, locality_group: PartitionHandle, prefix: String) -> Self {
         let snapshot = locality_group.snapshot_at(instant);
 
         Self {
@@ -68,7 +69,13 @@ impl Reader {
             buffer: VecDeque::with_capacity(1_000),
             cells_scanned_count: 0,
             bytes_scanned_count: 0,
+            chunk_size: 1_000,
         }
+    }
+
+    pub fn chunk_size(mut self, n: usize) -> Self {
+        self.chunk_size = n;
+        self
     }
 }
 
@@ -108,12 +115,12 @@ impl Iterator for &mut Reader {
                 .snapshot
                 .range(range.clone())
                 .into_iter()
-                .take(1_000)
+                .take(self.chunk_size)
                 .filter(|x| match x {
                     Ok((key, _)) => key.starts_with(self.prefix.as_bytes()),
                     Err(_) => true,
                 })
-                .collect::<lsm_tree::Result<Vec<_>>>()
+                .collect::<Result<Vec<_>, fjall::LsmError>>()
             {
                 Ok(chunk) => {
                     if chunk.is_empty() {

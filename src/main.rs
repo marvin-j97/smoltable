@@ -14,7 +14,7 @@ use actix_web::{
     http::header::ContentType, middleware::Logger, web, App, HttpResponse, HttpServer,
 };
 use app_state::AppState;
-use column_key::{ColumnKey, ParsedColumnKey};
+use column_key::ColumnKey;
 use error::CustomRouteResult;
 use manifest::ManifestTable;
 use metrics::MetricsTable;
@@ -167,6 +167,7 @@ async fn main() -> fjall::Result<()> {
 
     let keyspace = fjall::Config::new(data_folder())
         .block_cache(block_cache.clone())
+        // TODO: write buffer setting
         .open()?;
 
     let manifest_table = ManifestTable::open(keyspace.clone())?;
@@ -292,7 +293,7 @@ async fn main() -> fjall::Result<()> {
 
                 for (table_name, table) in tables.iter() {
                     let folder_size = table.disk_space_usage();
-                    let segment_count = table.tree.segment_count();
+                    let segment_count = table.segment_count();
 
                     TableWriter::write_raw(
                         metrics_table.deref().clone(),

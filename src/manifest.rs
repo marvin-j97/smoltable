@@ -47,7 +47,7 @@ impl ManifestTable {
             .tree
             .iter()
             .into_iter()
-            .collect::<lsm_tree::Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>, fjall::LsmError>>()?;
 
         let names = items
             .into_iter()
