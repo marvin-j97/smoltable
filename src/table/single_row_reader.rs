@@ -37,7 +37,7 @@ pub fn get_affected_locality_groups(
 
     if let Some(cf) = column_filter {
         match cf {
-            ColumnFilter::Key(key) => {
+            ColumnFilter::Key(key) | ColumnFilter::Prefix(key) => {
                 let lock = table.locality_groups.read().expect("lock is poisoned");
 
                 let column_family_name = &key.family;

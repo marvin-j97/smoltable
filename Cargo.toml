@@ -11,9 +11,9 @@ categories = ["data-structures", "database-implementations", "algorithms"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [profile.release]
-#lto = true
-#codegen-units = 1
-#strip = "debuginfo"
+lto = true
+codegen-units = 1
+strip = "debuginfo"
 
 [dependencies]
 actix-web = "4.4.1"

@@ -48,6 +48,25 @@ fn satisfies_column_filter(cell: &VisitedCell, filter: &ColumnFilter) -> bool {
 
             false
         }
+        ColumnFilter::Prefix(key) => {
+            if cell.column_key.family != key.family {
+                return false;
+            }
+
+            if let Some(cq_filter) = &key.qualifier {
+                if !cell
+                    .column_key
+                    .qualifier
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with(cq_filter)
+                {
+                    return false;
+                }
+            }
+
+            true
+        }
     }
 }
 
@@ -104,6 +123,9 @@ pub enum ColumnFilter {
 
     #[serde(rename = "multi_key")]
     Multi(Vec<ParsedColumnKey>),
+
+    #[serde(rename = "prefix")]
+    Prefix(ParsedColumnKey),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -386,6 +408,8 @@ impl Smoltable {
             bytes_scanned_count,
         })
     }
+
+    // TODO: need a PrefixReader... for delete and count
 
     pub fn query_prefix(&self, input: QueryPrefixInput) -> fjall::Result<QueryOutput> {
         let column_filter = &input.column.as_ref().and_then(|x| x.filter.clone());
