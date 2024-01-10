@@ -8,9 +8,9 @@ pub enum Value {
     U8(u8),
     I32(i32),
     I64(i64),
-    // U128(u128),
     F32(f32),
     F64(f64),
+    // U128(u128),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -21,6 +21,6 @@ pub struct Cell {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Row {
-    pub key: String,
+    pub row_key: String,
     pub columns: HashMap<String, HashMap<String, Vec<Cell>>>,
 }

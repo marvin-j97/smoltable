@@ -21,9 +21,10 @@ struct SystemInfo {
 pub async fn handler(app_state: web::Data<AppState>) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let system_metrics = app_state.metrics_table.query_timeseries("sys", None)?;
+    /* let system_metrics = app_state.metrics_table.query_timeseries("sys", None)?; */
+    unimplemented!()
 
-    Ok(build_response(
+    /* Ok(build_response(
         before.elapsed(),
         StatusCode::OK,
         "System info retrieved successfully",
@@ -32,5 +33,5 @@ pub async fn handler(app_state: web::Data<AppState>) -> CustomRouteResult<HttpRe
                 "metrics": system_metrics,
             }
         }),
-    ))
+    )) */
 }

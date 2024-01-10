@@ -1,65 +1,81 @@
-use super::bad_request;
 use crate::app_state::AppState;
 use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
+use crate::table::cell::Value as CellValue;
+use crate::table::single_row_reader::QueryRowInput;
 use crate::table::writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter};
-use crate::table::{cell::Value as CellValue, QueryInput};
 use actix_web::http::StatusCode;
 use actix_web::{
     post,
     web::{self, Path},
     HttpResponse,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::ops::Deref;
 
-#[post("/v1/table/{name}/get-row")]
+#[derive(Debug, Deserialize, Serialize)]
+struct Input {
+    items: Vec<QueryRowInput>,
+}
+
+#[post("/v1/table/{name}/rows")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
-    req_body: web::Json<QueryInput>,
+    req_body: web::Json<Input>,
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.tables.write().await;
+    let tables = app_state.tables.read().await;
 
     let table_name = path.into_inner();
 
-    if !is_valid_identifier(&req_body.row_key) {
-        return bad_request(before, "Invalid row key");
+    if table_name.starts_with('_') {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
+    }
+
+    if !is_valid_identifier(&table_name) {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let key = match &req_body.column_filter {
-            Some(filter) => filter.build_key(&req_body.row_key),
-            None => format!("{}:", req_body.row_key),
-        };
-
-        let result = table.query(&QueryInput {
-            row_key: key,
-            column_filter: None,
-            row_limit: req_body.row_limit,
-            cell_limit: req_body.cell_limit,
-        })?;
+        let result = table.multi_get(req_body.items.clone())?;
 
         let dur = before.elapsed();
 
         let micros_total = dur.as_micros();
 
+        let micros_per_row = if result.rows.is_empty() {
+            None
+        } else {
+            Some(micros_total / result.rows.len() as u128)
+        };
+
         TableWriter::write_raw(
-            &app_state.metrics_table,
+            app_state.metrics_table.deref().clone(),
             &RowWriteItem {
                 row_key: format!("t#{table_name}"),
                 cells: vec![ColumnWriteItem {
                     column_key: ColumnKey::try_from("lat:r#row").expect("should be column key"),
                     timestamp: None,
-                    value: CellValue::F64(micros_total as f64),
+                    value: CellValue::F64(micros_per_row.unwrap_or_default() as f64),
                 }],
             },
         )
         .ok();
-        app_state.metrics_table.tree.flush().ok();
 
         Ok(build_response(
             dur,
@@ -67,9 +83,11 @@ pub async fn handler(
             "Query successful",
             &json!({
                 "micros": micros_total,
+                "micros_per_row": micros_per_row,
                 "rows_scanned": result.rows_scanned_count,
                 "cells_scanned": result.cells_scanned_count,
-                "row": result.rows.get(0)
+                "bytes_scanned": result.bytes_scanned_count,
+                "rows": result.rows
             }),
         ))
     } else {

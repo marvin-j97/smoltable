@@ -2,7 +2,7 @@ pub mod create_column_family;
 pub mod create_table;
 pub mod delete_row;
 pub mod delete_table;
-pub mod get_row;
+pub mod get_rows;
 pub mod list_tables;
 pub mod metrics;
 pub mod prefix;

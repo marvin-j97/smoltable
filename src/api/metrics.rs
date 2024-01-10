@@ -1,9 +1,6 @@
-use super::bad_request;
 use crate::app_state::AppState;
 use crate::error::CustomRouteResult;
-use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
-use crate::table::QueryInput;
 use actix_web::http::StatusCode;
 use actix_web::{
     get,
@@ -16,7 +13,6 @@ use serde_json::json;
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
-    req_body: web::Json<QueryInput>,
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
@@ -24,21 +20,21 @@ pub async fn handler(
 
     let table_name = path.into_inner();
 
-    if !is_valid_identifier(&req_body.row_key) {
-        return bad_request(before, "Invalid row key");
-    }
+    let actual_name = format!("usr_{table_name}");
 
-    if tables.get(&table_name).is_some() {
-        let rows = app_state
-            .metrics_table
-            .query_timeseries(&format!("t#{table_name}"), None)?;
+    if tables.get(&actual_name).is_some() {
+        /* let rows = app_state
+        .metrics_table
+        .query_timeseries(&format!("t#{actual_name}"), None)?; */
 
-        Ok(build_response(
+        unimplemented!()
+
+        /* Ok(build_response(
             before.elapsed(),
             StatusCode::OK,
             "Metrics query successful",
             &json!(rows),
-        ))
+        )) */
     } else {
         Ok(build_response(
             before.elapsed(),

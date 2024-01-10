@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smoltable Dashboard</title>
+  </head>
+  <body class="p-4 dark:bg-slate-950">
+    <div id="root"></div>
+    <div class="text-center text-sm text-slate-500">
+      Rendered in {{render_time_ms}}ms
+    </div>
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+  <!-- <script id="system-metrics-data" type="application/json; utf-8">
+    {"key":"sys","columns":{"stats":{"cpu":[{"timestamp":1702428799599715991,"value":{"F64":1.16}},{"timestamp":1702428462658821508,"value":{"F64":0.85}},{"timestamp":1702428420787418324,"value":{"F64":0.91}},{"timestamp":1702428360679595803,"value":{"F64":0.57}},{"timestamp":1702428300599798949,"value":{"F64":0.98}},{"timestamp":1702428240504143600,"value":{"F64":1.39}},{"timestamp":1702428180417658163,"value":{"F64":2.18}}],"mem":[{"timestamp":1702428799599724801,"value":{"U64":7250874368}},{"timestamp":1702428462658830486,"value":{"U64":8368549888}},{"timestamp":1702428420787432495,"value":{"U64":8173436928}},{"timestamp":1702428360679604890,"value":{"U64":8188993536}},{"timestamp":1702428300599813565,"value":{"U64":8119185408}},{"timestamp":1702428240504151855,"value":{"U64":8173551616}},{"timestamp":1702428180417694632,"value":{"U64":8214417408}}]}}}
+  </script> -->
+  <script id="system-metrics-data" type="application/json; utf-8">
+    {{system_metrics}}
+  </script>
+  <script id="disk-usage-data" type="application/json; utf-8">
+    {{disk_usage}}
+  </script>
+  <script id="latency-data" type="application/json; utf-8">
+    {{latency}}
+  </script>
+</html>

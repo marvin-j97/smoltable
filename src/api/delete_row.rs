@@ -1,9 +1,10 @@
-use super::bad_request;
 use crate::app_state::AppState;
 use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
+use crate::table::cell::Value as CellValue;
+use crate::table::writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter};
 use actix_web::http::StatusCode;
 use actix_web::{
     delete,
@@ -12,12 +13,15 @@ use actix_web::{
 };
 use serde::Deserialize;
 use serde_json::json;
+use std::ops::Deref;
 
 #[derive(Debug, Deserialize)]
 pub struct Input {
     row_key: String,
-    column_filter: Option<ColumnKey>,
+    // column_filter: Option<ColumnKey>,
 }
+
+// TODO: change input format
 
 #[delete("/v1/table/{name}/row")]
 pub async fn handler(
@@ -31,23 +35,47 @@ pub async fn handler(
 
     let table_name = path.into_inner();
 
-    if !is_valid_identifier(&req_body.row_key) {
-        return bad_request(before, "Invalid row key");
+    if table_name.starts_with('_') {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
+    }
+
+    if !is_valid_identifier(&table_name) {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let key = match &req_body.column_filter {
-            Some(filter) => filter.build_key(&req_body.row_key),
-            None => format!("{}:", req_body.row_key),
-        };
+        let count = table.delete_row(req_body.row_key.clone())?;
 
-        let count = table.delete_cells(&key)?;
+        let micros_total = before.elapsed().as_micros();
 
         let micros_per_item = if count == 0 {
             None
         } else {
-            Some(before.elapsed().as_micros() / count as u128)
+            Some(micros_total / count as u128)
         };
+
+        TableWriter::write_raw(
+            app_state.metrics_table.deref().clone(),
+            &RowWriteItem {
+                row_key: format!("t#{table_name}"),
+                cells: vec![ColumnWriteItem {
+                    column_key: ColumnKey::try_from("lat:del#row").expect("should be column key"),
+                    timestamp: None,
+                    value: CellValue::F64(micros_total as f64),
+                }],
+            },
+        )
+        .ok();
 
         Ok(build_response(
             before.elapsed(),

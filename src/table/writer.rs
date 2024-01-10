@@ -1,9 +1,10 @@
 use super::{CellValue, Smoltable};
 use crate::column_key::ColumnKey;
-use lsm_tree::Batch;
+use fjall::Batch;
 use serde::Deserialize;
 
 pub struct Writer {
+    table: Smoltable,
     batch: Batch,
 }
 
@@ -28,15 +29,28 @@ fn timestamp_nano() -> u128 {
 }
 
 impl Writer {
-    pub fn new(target_table: &Smoltable) -> Self {
+    pub fn new(target_table: Smoltable) -> Self {
         let batch = target_table.batch();
-        Self { batch }
+
+        Self {
+            table: target_table,
+            batch,
+        }
     }
 
-    pub fn write_raw(table: &Smoltable, item: &RowWriteItem) -> lsm_tree::Result<()> {
+    // TODO: write to correct partition based on locality group
+
+    pub fn write_raw(table: Smoltable, item: &RowWriteItem) -> fjall::Result<()> {
+        let mut writer = Self::new(table);
+        writer.write(item)?;
+        writer.finalize()?;
+        Ok(())
+    }
+
+    pub fn write(&mut self, item: &RowWriteItem) -> fjall::Result<()> {
         for cell in &item.cells {
             let mut key = format!(
-                "{}:cf:{}:c:{}:",
+                "{}:{}:{}:",
                 item.row_key,
                 cell.column_key.family,
                 cell.column_key
@@ -52,38 +66,18 @@ impl Writer {
             key.extend_from_slice(&(!cell.timestamp.unwrap_or_else(timestamp_nano)).to_be_bytes());
 
             let encoded_value = bincode::serialize(&cell.value).expect("should serialize");
-            table.tree.insert(key, encoded_value)?;
+
+            let partition = self
+                .table
+                .get_partition_for_column_family(&cell.column_key.family)?;
+
+            self.batch.insert(&partition, key, encoded_value);
         }
 
         Ok(())
     }
 
-    pub fn write(&mut self, item: &RowWriteItem) -> lsm_tree::Result<()> {
-        for cell in &item.cells {
-            let mut key = format!(
-                "{}:cf:{}:c:{}:",
-                item.row_key,
-                cell.column_key.family,
-                cell.column_key
-                    .qualifier
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_else(|| String::from("")),
-            )
-            .as_bytes()
-            .to_vec();
-
-            // NOTE: Reverse the timestamp to store it in descending order
-            key.extend_from_slice(&(!cell.timestamp.unwrap_or_else(timestamp_nano)).to_be_bytes());
-
-            let encoded_value = bincode::serialize(&cell.value).expect("should serialize");
-            self.batch.insert(key, encoded_value);
-        }
-
-        Ok(())
-    }
-
-    pub fn finalize(self) -> lsm_tree::Result<()> {
+    pub fn finalize(self) -> fjall::Result<()> {
         self.batch.commit()
     }
 }

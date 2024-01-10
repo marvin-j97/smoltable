@@ -10,8 +10,8 @@ pub struct ParsedColumnKey {
 impl ParsedColumnKey {
     pub fn build_key(&self, row_key: &str) -> String {
         match &self.qualifier {
-            Some(cq) => format!("{row_key}:cf:{}:c:{}:", self.family, cq),
-            None => format!("{row_key}:cf:{}:c:", self.family),
+            Some(cq) => format!("{row_key}:{}:{}:", self.family, cq),
+            None => format!("{row_key}:{}:", self.family),
         }
     }
 }
@@ -42,7 +42,7 @@ impl TryFrom<&str> for ParsedColumnKey {
                 qualifier: None,
             }),
             (Some(family), Some(qualifier)) => {
-                if !is_valid_identifier(family) || !is_valid_identifier(qualifier) {
+                if !is_valid_identifier(family) {
                     return Err(());
                 }
 

@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use super::bad_request;
 use crate::app_state::AppState;
 use crate::column_key::ColumnKey;
@@ -28,32 +30,47 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.tables.read().await;
-
-    let table_name = path.into_inner();
-
     if req_body.items.is_empty() {
         return bad_request(before, "Items array should not be empty");
     }
 
+    let tables = app_state.tables.read().await;
+
+    let table_name = path.into_inner();
+
+    if table_name.starts_with('_') {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
+    }
+
+    if !is_valid_identifier(&table_name) {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
+    }
+
     if let Some(table) = tables.get(&table_name) {
-        let mut writer = TableWriter::new(table);
+        let mut writer = TableWriter::new(table.clone());
 
         drop(tables);
 
         for row in &req_body.items {
-            if !is_valid_identifier(&row.row_key) {
-                return bad_request(before, "Invalid row key");
-            }
-
-            for cell in &row.cells {
+            // TODO:
+            /* for cell in &row.cells {
                 if !app_state
                     .manifest_table
-                    .column_family_exists(&table_name, &cell.column_key.family)?
+                    .column_family_exists(&actual_name, &cell.column_key.family)?
                 {
                     return bad_request(before, "Column family does not exist");
                 }
-            }
+            } */
 
             if let Err(write_error) = writer.write(row) {
                 log::error!("Write error: {write_error:#?}");
@@ -86,7 +103,7 @@ pub async fn handler(
         };
 
         TableWriter::write_raw(
-            &app_state.metrics_table,
+            app_state.metrics_table.deref().clone(),
             &RowWriteItem {
                 row_key: format!("t#{table_name}"),
                 cells: vec![ColumnWriteItem {
@@ -97,7 +114,6 @@ pub async fn handler(
             },
         )
         .ok();
-        app_state.metrics_table.tree.flush().ok();
 
         Ok(build_response(
             dur,

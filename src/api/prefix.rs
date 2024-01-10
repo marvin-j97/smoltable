@@ -1,9 +1,11 @@
 use crate::app_state::AppState;
 use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
+use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
+use crate::table::cell::Value as CellValue;
 use crate::table::writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter};
-use crate::table::{cell::Value as CellValue, QueryInput};
+use crate::table::QueryPrefixInput;
 use actix_web::http::StatusCode;
 use actix_web::{
     post,
@@ -11,12 +13,13 @@ use actix_web::{
     HttpResponse,
 };
 use serde_json::json;
+use std::ops::Deref;
 
 #[post("/v1/table/{name}/prefix")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
-    req_body: web::Json<QueryInput>,
+    req_body: web::Json<QueryPrefixInput>,
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
@@ -24,8 +27,26 @@ pub async fn handler(
 
     let table_name = path.into_inner();
 
+    if table_name.starts_with('_') {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
+    }
+
+    if !is_valid_identifier(&table_name) {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
+    }
+
     if let Some(table) = tables.get(&table_name) {
-        let result = table.query(&req_body)?;
+        let result = table.query_prefix(req_body.0)?;
 
         let dur = before.elapsed();
 
@@ -38,7 +59,7 @@ pub async fn handler(
         };
 
         TableWriter::write_raw(
-            &app_state.metrics_table,
+            app_state.metrics_table.deref().clone(),
             &RowWriteItem {
                 row_key: format!("t#{table_name}"),
                 cells: vec![ColumnWriteItem {
@@ -49,7 +70,12 @@ pub async fn handler(
             },
         )
         .ok();
-        app_state.metrics_table.tree.flush().ok();
+
+        let cell_count = result
+            .rows
+            .iter()
+            .map(|x| x.columns.values().map(|x| x.len()).sum::<usize>())
+            .sum::<usize>();
 
         Ok(build_response(
             dur,
@@ -60,6 +86,9 @@ pub async fn handler(
                 "micros_per_row": micros_per_row,
                 "rows_scanned": result.rows_scanned_count,
                 "cells_scanned": result.cells_scanned_count,
+                "bytes_scanned": result.bytes_scanned_count,
+                "row_count": result.rows.len(),
+                "cell_count": cell_count,
                 "rows": result.rows
             }),
         ))
