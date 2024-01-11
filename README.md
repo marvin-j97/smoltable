@@ -9,6 +9,7 @@ Smoltable is a tiny wide-column store heavily inspired by [Google Bigtable](http
 ## Data model
 
 Its data model is essentially the same as Bigtable’s, where each row:
+
 - is identified by its row and
 - can have arbitrarily many columns
 
@@ -17,18 +18,19 @@ Columns are grouped into column families. The table is sparse, so unused columns
 In Bigtable, stored values are byte blobs; Smoltable supports multiple data types out of the box:
 
 - String (UTF-8 encoded string)
-- U8 (unsigned integer, 1 byte)
+- Boolean (like U8, but is unmarshalled as boolean)
+- Byte (unsigned integer, 1 byte)
 - I32 (signed integer, 4 bytes)
 - I64 (signed integer, 8 bytes)
-- U128 (signed integer, 16 bytes)
-- Boolean (like U8, but is unmarshalled as boolean)
 - F32 (floating point, 4 bytes)
 - F64 (floating point, 8 bytes)
 
+Column families can be grouped into locality groups, which partitions their columns into separate files, which increases scan performance over those column families (e.g. OLAP-style queries over a specific column).
+
 ## Compatibility
 
-Smoltable is not a replacement for Bigtable, nor is it wire-compatible with it. It is not distributed, but you probably could make it distributed. Then we would have `Bigsmoltable`. Also, locality groups are currently not supported. But it is a great, inexpensive way to learn about wide-column and single table data design.
+Smoltable is not a replacement for Bigtable, nor is it wire-compatible with it. It is not distributed, but you probably could make it distributed. Then we would have `Bigsmoltable`. But it is a great, inexpensive way to learn about wide-column and single table data design.
 
 ## License
 
-All source code is MIT-licensed.
+All source code is (MIT OR Apache 2.0)-licensed.

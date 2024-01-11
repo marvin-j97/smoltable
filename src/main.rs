@@ -336,7 +336,7 @@ async fn main() -> fjall::Result<()> {
                                 column_key: ColumnKey::try_from("stats:wal_cnt")
                                     .expect("should be column key"),
                                 timestamp: None,
-                                value: table::cell::Value::U8(journal_count as u8),
+                                value: table::cell::Value::Byte(journal_count as u8),
                             },
                         ],
                     },
