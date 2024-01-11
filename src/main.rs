@@ -301,26 +301,10 @@ async fn main() -> fjall::Result<()> {
                                     value: table::cell::Value::F64(segment_count as f64),
                                 },
                                 ColumnWriteItem {
-                                    column_key: ColumnKey::try_from("stats:du") // TODO: DU is broken, need to scan all locality groups + meta partitions
+                                    column_key: ColumnKey::try_from("stats:du")
                                         .expect("should be column key"),
                                     timestamp: None,
                                     value: table::cell::Value::F64(folder_size as f64),
-                                },
-                                ColumnWriteItem {
-                                    column_key: ColumnKey::try_from("stats:mem_cache")
-                                        .expect("should be column key"),
-                                    timestamp: None,
-                                    value: table::cell::Value::F64(
-                                        table.cache_memory_usage() as f64
-                                    ),
-                                },
-                                ColumnWriteItem {
-                                    column_key: ColumnKey::try_from("stats:cache_blocks")
-                                        .expect("should be column key"),
-                                    timestamp: None,
-                                    value: table::cell::Value::F64(
-                                        table.cached_block_count() as f64
-                                    ),
                                 },
                             ],
                         },

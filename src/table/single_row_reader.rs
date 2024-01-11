@@ -19,16 +19,10 @@ pub struct QueryRowInputColumnOptions {
     pub filter: Option<ColumnFilter>,
 }
 
-/* #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct QueryRowInputCellOptions {
-    pub limit: Option<u16>,
-} */
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryRowInput {
     pub row: QueryRowInputRowOptions,
     pub column: Option<QueryRowInputColumnOptions>,
-    // pub cell: Option<QueryRowInputCellOptions>,
 }
 
 pub fn get_affected_locality_groups(

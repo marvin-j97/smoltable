@@ -1,7 +1,7 @@
 use crate::app_state::AppState;
 use crate::error::CustomRouteResult;
 use crate::response::build_response;
-use crate::table::ColumnFamilyDefinition;
+use crate::table::{ColumnFamilyDefinition, BLOCK_SIZE};
 use actix_web::http::StatusCode;
 use actix_web::{get, web, HttpResponse};
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use std::sync::Arc;
 #[derive(Debug, Deserialize, Serialize)]
 struct CacheStats {
     block_count: usize,
-    memory_usage_in_bytes: usize,
+    memory_usage_in_bytes: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -46,11 +46,11 @@ pub async fn handler(app_state: web::Data<AppState>) -> CustomRouteResult<HttpRe
         })
         .collect::<fjall::Result<Vec<_>>>()?;
 
-    let metrics_table = tables.get("_metrics").expect("should exist");
+    let cached_block_count = app_state.block_cache.len();
 
     let cache_stats = CacheStats {
-        block_count: metrics_table.cached_block_count(),
-        memory_usage_in_bytes: metrics_table.cache_memory_usage(),
+        block_count: cached_block_count,
+        memory_usage_in_bytes: cached_block_count as u64 * u64::from(BLOCK_SIZE),
     };
 
     Ok(build_response(

@@ -15,6 +15,11 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+// NOTE: Bigger block size is advantageous for Smoltable, because:
+// - better compression ratio when block is larger
+// - workload is dominated by prefix & range searches
+pub const BLOCK_SIZE: u32 = /* 64 KiB */ 64 * 1024;
+
 fn satisfies_column_filter(cell: &VisitedCell, filter: &ColumnFilter) -> bool {
     match filter {
         ColumnFilter::Key(key) => {
@@ -68,8 +73,6 @@ fn satisfies_column_filter(cell: &VisitedCell, filter: &ColumnFilter) -> bool {
         }
     }
 }
-
-pub const BLOCK_SIZE: u32 = /* 32 KiB */ 32 * 1024;
 
 #[derive(Clone)]
 pub struct LocalityGroup {
@@ -271,7 +274,7 @@ impl Smoltable {
                     column_families,
                     tree: self.keyspace.open_partition(
                         &format!("_lg_{id}"),
-                        fjall::PartitionCreateOptions::default(),
+                        fjall::PartitionCreateOptions::default().block_size(BLOCK_SIZE),
                     )?,
                 })
             })
@@ -508,6 +511,9 @@ impl Smoltable {
                 }
             }
 
+            // IMPORTANT: Even if the row has no matching columns, we need to temporarily add it to
+            // the buffer, so we can track in which row we are currently in (to increment `rows_scanned_count`)
+            // After that it gets removed, if the column count stays 0
             let row = rows.entry(cell.row_key).or_insert_with_key(|key| Row {
                 row_key: key.clone(),
                 columns: HashMap::default(),
@@ -540,6 +546,8 @@ impl Smoltable {
             cells_scanned_count += reader.cells_scanned_count;
             bytes_scanned_count += reader.bytes_scanned_count;
         }
+
+        rows.retain(|_, row| row.column_count() > 0);
 
         Ok(QueryOutput {
             rows: rows.into_values().collect(),
@@ -600,6 +608,8 @@ impl Smoltable {
                 });
             }
 
+            // TODO: row cell limit
+
             // TODO: unit test cell limit with multiple columns etc
         }
 
@@ -654,18 +664,6 @@ impl Smoltable {
         // TODO: add meta partitions sizes
 
         bytes
-    }
-
-    pub fn cached_block_count(&self) -> usize {
-        // self.tree.block_cache_size()
-        // TODO:
-        0
-    }
-
-    pub fn cache_memory_usage(&self) -> usize {
-        // self.tree.block_cache_size() * (self.tree.config().block_size as usize)
-        // TODO:
-        0
     }
 }
 
