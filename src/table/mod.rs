@@ -202,7 +202,7 @@ impl Smoltable {
             let tree = keyspace.open_partition(&format!("_dat_{name}"), config)?;
             tree.set_compaction_strategy(Arc::new(fjall::compaction::Levelled {
                 target_size: 64 * 1_024 * 1_024,
-                l0_threshold: 2,
+                l0_threshold: 4,
             }));
             tree
         };
