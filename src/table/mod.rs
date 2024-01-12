@@ -1,4 +1,5 @@
 pub mod cell;
+pub mod merge_reader;
 pub mod reader;
 pub mod single_row_reader;
 pub mod writer;
@@ -7,7 +8,10 @@ use self::{
     cell::{Cell, Row, Value as CellValue, VisitedCell},
     single_row_reader::{QueryRowInput, QueryRowInputRowOptions, SingleRowReader},
 };
-use crate::{column_key::ColumnKey, table::single_row_reader::get_affected_locality_groups};
+use crate::{
+    column_key::ColumnKey,
+    table::{merge_reader::MergeReader, single_row_reader::get_affected_locality_groups},
+};
 use fjall::{Batch, Keyspace, PartitionHandle};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -326,6 +330,8 @@ impl Smoltable {
     } */
 
     pub fn count(&self) -> fjall::Result<(usize, usize)> {
+        use reader::Reader as TableReader;
+
         let mut cell_count = 0;
         let mut row_count = 0;
 
@@ -335,15 +341,26 @@ impl Smoltable {
         let locality_groups_to_scan = get_affected_locality_groups(self, &None)?;
         let instant = self.keyspace.instant();
 
-        // TODO: scan default partition and count rows (+ cells), then only count cells for other locality groups
+        let readers = locality_groups_to_scan
+            .into_iter()
+            .map(|x| TableReader::new(instant, x, "".into()))
+            .collect::<Vec<_>>();
 
-        for locality_group in locality_groups_to_scan {
-            let mut reader =
-                reader::Reader::new(instant, locality_group, "".into()).chunk_size(10_000);
+        let mut current_row_key = None;
 
-            for cell in &mut reader {
-                let _ = cell?;
-                cell_count += 1;
+        let mut reader = MergeReader::new(readers);
+        loop {
+            let Some(cell) = (&mut reader).next() else {
+                break;
+            };
+
+            let cell = cell?;
+
+            cell_count += 1;
+
+            if current_row_key.is_none() || current_row_key.clone().unwrap() != cell.row_key {
+                current_row_key = Some(cell.row_key);
+                row_count += 1;
             }
         }
 
@@ -397,8 +414,6 @@ impl Smoltable {
         })
     }
 
-    // TODO: need a PrefixReader... for count
-
     pub fn query_prefix(&self, input: QueryPrefixInput) -> fjall::Result<QueryOutput> {
         use reader::Reader as TableReader;
 
@@ -431,14 +446,16 @@ impl Smoltable {
         let mut bytes_scanned_count = 0;
         let mut cell_count = 0; // Cell count over all aggregated rows
 
+        let mut row_sample_counter = 1.0_f32;
+
         let mut rows: BTreeMap<String, Row> = BTreeMap::new();
 
-        let mut readers = locality_groups_to_scan
+        let readers = locality_groups_to_scan
             .into_iter()
             .map(|x| TableReader::new(instant, x, input.prefix.clone()))
             .collect::<Vec<_>>();
 
-        let mut row_sample_counter = 1.0_f32;
+        let mut reader = MergeReader::new(readers);
 
         loop {
             // We are gonna visit another cell, if the global cell limit is reached
@@ -447,38 +464,11 @@ impl Smoltable {
                 break;
             }
 
-            // Peek all readers
-            let cells = readers
-                .iter_mut()
-                .map(TableReader::peek)
-                .collect::<Vec<_>>();
-
-            // Throw if error
-            let cells = cells
-                .into_iter()
-                .map(Option::transpose)
-                .collect::<fjall::Result<Vec<Option<VisitedCell>>>>()?;
-
-            // Get index of reader that has lowest row
-            let lowest_idx = cells
-                .into_iter()
-                .enumerate()
-                .filter(|(_, cell)| Option::is_some(cell))
-                .map(|(idx, cell)| (idx, cell.unwrap()))
-                .max_by(|(_, a), (_, b)| a.raw_key.cmp(&b.raw_key));
-
-            let Some((lowest_idx, _)) = lowest_idx else {
-                // No more items
+            let Some(cell) = (&mut reader).next() else {
                 break;
             };
 
-            // Consume from iterator with lowest item
-            let cell = readers
-                .get_mut(lowest_idx)
-                .unwrap()
-                .next()
-                .transpose()?
-                .unwrap();
+            let cell = cell?;
 
             if let Some(filter) = column_filter {
                 if !satisfies_column_filter(&cell, filter) {
@@ -542,10 +532,8 @@ impl Smoltable {
             cell_count += 1;
         }
 
-        for reader in readers {
-            cells_scanned_count += reader.cells_scanned_count;
-            bytes_scanned_count += reader.bytes_scanned_count;
-        }
+        cells_scanned_count += reader.cells_scanned_count();
+        bytes_scanned_count += reader.bytes_scanned_count();
 
         rows.retain(|_, row| row.column_count() > 0);
 
