@@ -30,6 +30,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           prefix-key: ${{ runner.os }}-cargo
+      - name: Build app
+        run: npm i && npm build
+        working-directory: app
       - name: Build
         run: cargo build -v
       - name: Format
