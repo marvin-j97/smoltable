@@ -18,7 +18,7 @@ Columns are grouped into column families. The table is sparse, so unused columns
 In Bigtable, stored values are byte blobs; Smoltable supports multiple data types out of the box:
 
 - String (UTF-8 encoded string)
-- Boolean (like U8, but is unmarshalled as boolean)
+- Boolean (like Byte, but is unmarshalled as boolean)
 - Byte (unsigned integer, 1 byte)
 - I32 (signed integer, 4 bytes)
 - I64 (signed integer, 8 bytes)
