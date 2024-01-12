@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for smoltable-1 on 2024-01-12T15:24:13+01:00
+# fly.toml app configuration file generated for smoltable-1 on 2024-01-12T16:34:55+01:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -19,8 +19,6 @@ kill_timeout = "5s"
 [[mounts]]
   source = "smoldata"
   destination = "/data"
-  initial_size = "3gb"
-  processes = ["disk"]
   auto_extend_size_threshold = 90
   auto_extend_size_increment = "1GB"
   auto_extend_size_limit = "50GB"
