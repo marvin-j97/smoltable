@@ -23,6 +23,6 @@ jobs:
         with:
           file: Dockerfile.alpine
           push: true # Will only build if this is not here
-          # TODO: ghcr.io/${{ github.repository }}:${{ github.ref }}
+          # TODO: .latest & ghcr.io/${{ github.repository }}:${{ github.ref }}
           tags: |
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:edge
