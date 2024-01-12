@@ -1,67 +1,78 @@
+use crate::app_state::AppState;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
-use crate::{app_state::AppState, manifest::ColumnFamilyDefinition};
+use crate::table::CreateColumnFamilyInput;
 use actix_web::http::StatusCode;
 use actix_web::{
     post,
     web::{self, Path},
     HttpResponse,
 };
-use serde::Deserialize;
 use serde_json::json;
 
-#[derive(Debug, Deserialize)]
-pub struct Input {
-    row_limit: Option<u64>,
-}
-
-#[post("/table/{name}/column-family/{cf_name}")]
+#[post("/v1/table/{name}/column-family")]
 pub async fn handler(
-    path: Path<(String, String)>,
+    path: Path<String>,
     app_state: web::Data<AppState>,
-    req_body: web::Json<Input>,
+    req_body: web::Json<CreateColumnFamilyInput>,
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let (table_name, cf_name) = path.into_inner();
+    let table_name = path.into_inner();
 
-    if !is_valid_identifier(&cf_name) {
+    if table_name.starts_with('_') {
         return Ok(build_response(
-            before,
+            before.elapsed(),
+            StatusCode::FORBIDDEN,
+            "Invalid table name",
+            &json!(null),
+        ));
+    }
+
+    if !is_valid_identifier(&table_name) {
+        return Ok(build_response(
+            before.elapsed(),
             StatusCode::BAD_REQUEST,
-            "Invalid column family name",
+            "Invalid table name",
             &json!(null),
         ));
     }
 
-    if app_state
-        .manifest_table
-        .column_family_exists(&table_name, &cf_name)?
-    {
-        return Ok(build_response(
-            before,
+    let tables = app_state.tables.write().await;
+
+    if let Some(table) = tables.get(&table_name) {
+        let existing_families = table
+            .list_column_families()?
+            .into_iter()
+            .map(|x| x.name)
+            .collect::<Vec<_>>();
+
+        for family in req_body.column_families.iter().map(|x| x.name.clone()) {
+            if existing_families.contains(&family) {
+                return Ok(build_response(
+                    before.elapsed(),
+                    StatusCode::CONFLICT,
+                    &format!("Column family {family} already exists"),
+                    &json!(null),
+                ));
+            }
+        }
+
+        table.create_column_families(&req_body.0)?;
+
+        Ok(build_response(
+            before.elapsed(),
+            StatusCode::CREATED,
+            "Column families created successfully",
+            &json!(null),
+        ))
+    } else {
+        Ok(build_response(
+            before.elapsed(),
             StatusCode::CONFLICT,
-            "Conflict",
+            "Table not found",
             &json!(null),
-        ));
+        ))
     }
-
-    app_state.manifest_table.persist_column_family(
-        &table_name,
-        &ColumnFamilyDefinition {
-            name: cf_name,
-            row_limit: req_body.row_limit,
-        },
-    )?;
-
-    // TODO: spawn GC thread... spawn on recover as well
-    // stop on delete table
-
-    Ok(build_response(
-        before,
-        StatusCode::CREATED,
-        "Column family created successfully",
-        &json!(null),
-    ))
 }

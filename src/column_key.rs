@@ -7,6 +7,15 @@ pub struct ParsedColumnKey {
     pub qualifier: Option<String>,
 }
 
+impl ParsedColumnKey {
+    pub fn build_key(&self, row_key: &str) -> String {
+        match &self.qualifier {
+            Some(cq) => format!("{row_key}:{}:{}:", self.family, cq),
+            None => format!("{row_key}:{}:", self.family),
+        }
+    }
+}
+
 impl std::fmt::Display for ParsedColumnKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -34,10 +43,6 @@ impl TryFrom<&str> for ParsedColumnKey {
             }),
             (Some(family), Some(qualifier)) => {
                 if !is_valid_identifier(family) {
-                    return Err(());
-                }
-
-                if !is_valid_identifier(qualifier) {
                     return Err(());
                 }
 

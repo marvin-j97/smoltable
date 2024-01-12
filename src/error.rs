@@ -1,7 +1,7 @@
 use actix_web::{HttpResponse, ResponseError};
 
 #[derive(Debug)]
-pub struct CustomHttpError(lsm_tree::Error);
+pub struct CustomHttpError(fjall::Error);
 
 impl std::fmt::Display for CustomHttpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -15,15 +15,15 @@ impl ResponseError for CustomHttpError {
     }
 }
 
-impl From<lsm_tree::Error> for CustomHttpError {
-    fn from(value: lsm_tree::Error) -> Self {
+impl From<fjall::Error> for CustomHttpError {
+    fn from(value: fjall::Error) -> Self {
         Self(value)
     }
 }
 
 impl From<std::io::Error> for CustomHttpError {
     fn from(value: std::io::Error) -> Self {
-        Self(lsm_tree::Error::from(value))
+        Self(fjall::Error::from(value))
     }
 }
 

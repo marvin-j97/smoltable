@@ -1,8 +1,11 @@
 use crate::app_state::AppState;
+use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
-use crate::table::QueryInput;
+use crate::table::cell::Value as CellValue;
+use crate::table::writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter};
+use crate::table::QueryPrefixInput;
 use actix_web::http::StatusCode;
 use actix_web::{
     post,
@@ -10,54 +13,90 @@ use actix_web::{
     HttpResponse,
 };
 use serde_json::json;
-use std::time::Instant;
+use std::ops::Deref;
 
-fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
-    Ok(build_response(
-        before,
-        StatusCode::BAD_REQUEST,
-        msg,
-        &json!(null),
-    ))
-}
-
-#[post("/table/{name}/prefix")]
+#[post("/v1/table/{name}/prefix")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
-    req_body: web::Json<QueryInput>,
+    req_body: web::Json<QueryPrefixInput>,
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.read().expect("lock is poisoned");
+    let tables = app_state.tables.read().await;
 
     let table_name = path.into_inner();
 
-    if !is_valid_identifier(&req_body.row_key) {
-        return bad_request(before, "Invalid row key");
+    if table_name.starts_with('_') {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
+    }
+
+    if !is_valid_identifier(&table_name) {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let rows = table.query(&req_body)?;
+        let result = table.query_prefix(req_body.0)?;
 
-        let micros_per_item = if rows.0.is_empty() {
+        let dur = before.elapsed();
+
+        let micros_total = dur.as_micros();
+
+        let micros_per_row = if result.rows.is_empty() {
             None
         } else {
-            Some(before.elapsed().as_micros() / rows.0.len() as u128)
+            Some(micros_total / result.rows.len() as u128)
         };
 
+        TableWriter::write_raw(
+            app_state.metrics_table.deref().clone(),
+            &RowWriteItem {
+                row_key: format!("t#{table_name}"),
+                cells: vec![ColumnWriteItem {
+                    column_key: ColumnKey::try_from("lat:r#pfx").expect("should be column key"),
+                    timestamp: None,
+                    value: CellValue::F64(micros_total as f64),
+                }],
+            },
+        )
+        .ok();
+
+        let cell_count = result
+            .rows
+            .iter()
+            .map(|x| x.columns.values().map(|x| x.len()).sum::<usize>())
+            .sum::<usize>();
+
         Ok(build_response(
-            before,
+            dur,
             StatusCode::OK,
             "Query successful",
             &json!({
-                "micros_per_item": micros_per_item,
-                "rows": rows
+                "micros_per_row": micros_total,
+                "micros_per_row": micros_per_row,
+                "rows_scanned": result.rows_scanned_count,
+                "cells_scanned": result.cells_scanned_count,
+                "bytes_scanned": result.bytes_scanned_count,
+                "row_count": result.rows.len(),
+                "cell_count": cell_count,
+                "rows": result.rows
             }),
         ))
     } else {
+        let dur = before.elapsed();
+
         Ok(build_response(
-            before,
+            dur,
             StatusCode::CONFLICT,
             "Table not found",
             &json!(null),

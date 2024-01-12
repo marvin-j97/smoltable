@@ -1,23 +1,24 @@
-use crate::{manifest::ManifestTable, table::SmolTable};
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
+use crate::{manifest::ManifestTable, metrics::MetricsTable, table::Smoltable};
+use fjall::{BlockCache, Keyspace};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
 
 pub struct AppState {
+    pub keyspace: Keyspace,
     pub manifest_table: Arc<ManifestTable>,
-    pub user_tables: RwLock<HashMap<String, SmolTable>>,
+    pub tables: Arc<RwLock<HashMap<String, Smoltable>>>,
+    pub block_cache: Arc<BlockCache>,
+    pub metrics_table: MetricsTable,
 }
 
 impl AppState {
-    pub fn create_table(&self, table_name: &str) -> lsm_tree::Result<SmolTable> {
-        let path = crate::data_folder().join("user_tables").join(table_name);
-        let table = SmolTable::new(path)?;
+    pub async fn create_table(&self, table_name: &str) -> fjall::Result<Smoltable> {
+        let mut tables = self.tables.write().await;
 
         self.manifest_table.persist_user_table(table_name)?;
+        let table = Smoltable::open(table_name, self.keyspace.clone())?;
 
-        let mut user_tables = self.user_tables.write().expect("lock is poisoned");
-        user_tables.insert(table_name.into(), table.clone());
+        tables.insert(table_name.into(), table.clone());
 
         Ok(table)
     }

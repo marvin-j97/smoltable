@@ -3,6 +3,8 @@ use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_identifier;
 use crate::response::build_response;
+use crate::table::cell::Value as CellValue;
+use crate::table::writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter};
 use actix_web::http::StatusCode;
 use actix_web::{
     delete,
@@ -11,24 +13,17 @@ use actix_web::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use std::time::Instant;
-
-fn bad_request(before: Instant, msg: &str) -> CustomRouteResult<HttpResponse> {
-    Ok(build_response(
-        before,
-        StatusCode::BAD_REQUEST,
-        msg,
-        &json!(null),
-    ))
-}
+use std::ops::Deref;
 
 #[derive(Debug, Deserialize)]
 pub struct Input {
     row_key: String,
-    column_filter: Option<ColumnKey>,
+    // column_filter: Option<ColumnKey>,
 }
 
-#[delete("/table/{name}/row")]
+// TODO: change input format
+
+#[delete("/v1/table/{name}/row")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
@@ -36,37 +31,54 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.user_tables.read().expect("lock is poisoned");
+    let tables = app_state.tables.read().await;
 
     let table_name = path.into_inner();
 
-    if !is_valid_identifier(&req_body.row_key) {
-        return bad_request(before, "Invalid row key");
+    if table_name.starts_with('_') {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
+    }
+
+    if !is_valid_identifier(&table_name) {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let mut key = format!("{}:", req_body.row_key);
+        let count = table.delete_row(req_body.row_key.clone())?;
 
-        if let Some(column_filter) = &req_body.column_filter {
-            let cf = &column_filter.family;
-
-            key.push_str(&format!("cf:{cf}"));
-
-            if let Some(cq) = &column_filter.qualifier {
-                key.push_str(&format!(":c:{cq}"));
-            }
-        }
-
-        let count = table.delete_row(&key)?;
+        let micros_total = before.elapsed().as_micros();
 
         let micros_per_item = if count == 0 {
             None
         } else {
-            Some(before.elapsed().as_micros() / count as u128)
+            Some(micros_total / count as u128)
         };
 
+        TableWriter::write_raw(
+            app_state.metrics_table.deref().clone(),
+            &RowWriteItem {
+                row_key: format!("t#{table_name}"),
+                cells: vec![ColumnWriteItem {
+                    column_key: ColumnKey::try_from("lat:del#row").expect("should be column key"),
+                    timestamp: None,
+                    value: CellValue::F64(micros_total as f64),
+                }],
+            },
+        )
+        .ok();
+
         Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::ACCEPTED,
             "Deletion completed successfully",
             &json!({
@@ -76,7 +88,7 @@ pub async fn handler(
         ))
     } else {
         Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::CONFLICT,
             "Table not found",
             &json!(null),

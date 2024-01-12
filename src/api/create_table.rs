@@ -9,7 +9,7 @@ use actix_web::{
 };
 use serde_json::json;
 
-#[put("/table/{name}")]
+#[put("/v1/table/{name}")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
@@ -18,19 +18,28 @@ pub async fn handler(
 
     let table_name = path.into_inner();
 
-    if !is_valid_identifier(&table_name) {
+    if table_name.starts_with('_') {
         return Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::BAD_REQUEST,
             "Invalid table name",
             &json!(null),
         ));
     }
 
-    let tables = app_state.user_tables.read().expect("lock is poisoned");
+    if !is_valid_identifier(&table_name) {
+        return Ok(build_response(
+            before.elapsed(),
+            StatusCode::BAD_REQUEST,
+            "Invalid table name",
+            &json!(null),
+        ));
+    }
+
+    let tables = app_state.tables.read().await;
     if tables.contains_key(&table_name) {
         return Ok(build_response(
-            before,
+            before.elapsed(),
             StatusCode::CONFLICT,
             "Conflict",
             &json!(null),
@@ -38,10 +47,10 @@ pub async fn handler(
     }
     drop(tables);
 
-    app_state.create_table(&table_name)?;
+    app_state.create_table(&table_name).await?;
 
     Ok(build_response(
-        before,
+        before.elapsed(),
         StatusCode::CREATED,
         "Table created successfully",
         &json!(null),
