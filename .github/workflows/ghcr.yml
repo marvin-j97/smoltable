@@ -18,11 +18,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.REGISTRY_TOKEN }}
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v2
-        with:
-          file: Dockerfile.alpine
-          push: true # Will only build if this is not here
-          # TODO: .latest & ghcr.io/${{ github.repository }}:${{ github.ref }}
-          tags: |
-            ghcr.io/${{ github.repository }}:edge
+      - name: Build and push Docker image
+        run: |
+          docker build . -f Dockerfile.alpine -t ghcr.io/${{ github.repository }}:edge
+          docker push ghcr.io/${{ github.repository }}:edge
