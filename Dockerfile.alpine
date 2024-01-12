@@ -25,5 +25,6 @@ WORKDIR /app
 
 COPY --from=rust-builder /app/target/release/smoltable /app/smoltable
 # COPY --from=node-builder /app/dist /app/dist
+# COPY dist /app/dist
 
 ENTRYPOINT ["/app/smoltable"]

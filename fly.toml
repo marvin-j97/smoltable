@@ -1,41 +1,57 @@
-# fly.toml file generated for smoltable-1 on 2023-12-05T15:51:17+01:00
+# fly.toml app configuration file generated for smoltable-1 on 2024-01-12T15:24:13+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
 app = "smoltable-1"
+primary_region = "ams"
 kill_signal = "SIGINT"
-kill_timeout = 5
-processes = []
+kill_timeout = "5s"
 
 [build]
-dockerfile = "Dockerfile.alpine"
-
-[[mounts]]
-source = "smoldata"
-destination = "/data"
-processes = ["disk"]
-initial_size = "3gb"
-auto_extend_size_threshold = 90
-auto_extend_size_increment = "1GB"
-auto_extend_size_limit = "50GB"
+  dockerfile = "Dockerfile.alpine"
 
 [env]
-RUST_LOG = "debug"
-PORT = "8080"
-SMOLTABLE_DATA = "/data"
+  PORT = "8080"
+  RUST_LOG = "debug"
+  SMOLTABLE_DATA = "/data"
+
+[[mounts]]
+  source = "smoldata"
+  destination = "/data"
+  initial_size = "3gb"
+  processes = ["disk"]
+  auto_extend_size_threshold = 90
+  auto_extend_size_increment = "1GB"
+  auto_extend_size_limit = "50GB"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 0
+  processes = ["app"]
 
 [[services]]
-internal_port = 8080
-processes = ["app"]
-protocol = "tcp"
-[services.concurrency]
-hard_limit = 25
-soft_limit = 20
-type = "connections"
+  protocol = "tcp"
+  internal_port = 8080
+  processes = ["app"]
 
-[[services.ports]]
-force_https = true
-handlers = ["http"]
-port = 80
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
 
-[[services.ports]]
-handlers = ["tls", "http"]
-port = 443
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
