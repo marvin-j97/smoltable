@@ -80,6 +80,7 @@ fn satisfies_column_filter(cell: &VisitedCell, filter: &ColumnFilter) -> bool {
 
 #[derive(Clone)]
 pub struct LocalityGroup {
+    pub id: Arc<str>,
     pub column_families: Vec<Arc<str>>,
     pub tree: PartitionHandle,
 }
@@ -275,6 +276,7 @@ impl Smoltable {
                 log::debug!("Loading locality group {id} <= {:?}", column_families);
 
                 Ok(LocalityGroup {
+                    id: id.into(),
                     column_families,
                     tree: self.keyspace.open_partition(
                         &format!("_lg_{id}"),

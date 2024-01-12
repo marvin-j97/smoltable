@@ -377,7 +377,6 @@ async fn main() -> fjall::Result<()> {
             .route("/", web::get().to(catch_all))
             .route("/index.html", web::get().to(catch_all))
             .service(api::list_tables::handler)
-            .service(api::system::handler)
             .service(api::create_table::handler)
             .service(api::write::handler)
             .service(api::get_rows::handler)

@@ -6,7 +6,6 @@ pub mod get_rows;
 pub mod list_tables;
 pub mod metrics;
 pub mod prefix;
-pub mod system;
 pub mod write;
 
 use crate::{error::CustomRouteResult, response::build_response};
