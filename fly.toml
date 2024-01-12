@@ -50,8 +50,3 @@ handlers = ["tls", "http"]
 type = "connections"
 hard_limit = 25
 soft_limit = 20
-
-[[vm]]
-cpu_kind = "shared"
-cpus = 1
-memory_mb = 1024
