@@ -19,5 +19,6 @@
 
 target
 .smoltable_data
-
 fly.toml
+
+/app/node_modules

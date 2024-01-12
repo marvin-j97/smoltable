@@ -1,4 +1,13 @@
 #
+# Node build stage
+#
+FROM node:20-alpine AS node-builder
+WORKDIR /app
+
+COPY . .
+RUN cd app && npm i && npm run build
+
+#
 # Rust Build stage
 #
 FROM rust:alpine as rust-builder
@@ -6,16 +15,10 @@ WORKDIR /app
 
 COPY . .
 
-RUN apk add --no-cache musl-dev && cargo build --release
+RUN apk add --no-cache musl-dev
 
-# #
-# # Node build stage
-# #
-# FROM node:20-alpine AS node-builder
-# WORKDIR /app
-
-# COPY . .
-# RUN cd app && npm i -g pnpm && pnpm i && pnpm build
+COPY --from=node-builder /app/dist /app/dist
+RUN cargo build --release
 
 #
 # Runner stage
@@ -24,7 +27,6 @@ FROM alpine as runner
 WORKDIR /app
 
 COPY --from=rust-builder /app/target/release/smoltable /app/smoltable
-# COPY --from=node-builder /app/dist /app/dist
-# COPY dist /app/dist
+COPY --from=node-builder /app/dist /app/dist
 
 ENTRYPOINT ["/app/smoltable"]
