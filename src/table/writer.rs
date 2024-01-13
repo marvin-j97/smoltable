@@ -21,7 +21,7 @@ pub struct RowWriteItem {
     pub cells: Vec<ColumnWriteItem>,
 }
 
-fn timestamp_nano() -> u128 {
+pub fn timestamp_nano() -> u128 {
     std::time::SystemTime::UNIX_EPOCH
         .elapsed()
         .unwrap()
@@ -38,11 +38,11 @@ impl Writer {
         }
     }
 
-    // TODO: write to correct partition based on locality group
-
-    pub fn write_raw(table: Smoltable, item: &RowWriteItem) -> fjall::Result<()> {
+    pub fn write_batch(table: Smoltable, items: &[RowWriteItem]) -> fjall::Result<()> {
         let mut writer = Self::new(table);
-        writer.write(item)?;
+        for item in items {
+            writer.write(item)?;
+        }
         writer.finalize()?;
         Ok(())
     }

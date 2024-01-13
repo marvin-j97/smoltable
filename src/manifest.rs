@@ -62,58 +62,15 @@ impl ManifestTable {
 
     pub fn persist_user_table(&self, table_name: &str) -> fjall::Result<()> {
         self.tree
-            .insert(format!("table:{table_name}:name"), table_name)?;
+            .insert(format!("table#{table_name}#name"), table_name)?;
 
         self.keyspace.persist()?;
 
         Ok(())
     }
 
-    /* pub fn get_user_table_column_families(
-        &self,
-        table_name: &str,
-    ) -> fjall::Result<Vec<ColumnFamilyDefinition>> {
-        let result = self.data.query(crate::table::reader::Input {
-            row_key: table_name.into(),
-            cell_limit: None,
-            column_filter: Some(ColumnKey::try_from("family:").unwrap()),
-            row_limit: None,
-        })?;
-
-        let Some(row) = result.rows.first() else {
-            return Ok(vec![]);
-        };
-
-        let Some(col_family) = row.columns.get("family") else {
-            return Ok(vec![]);
-        };
-
-        let names = col_family
-            .iter()
-            .map(|(key, cells)| (key, &cells[0]))
-            .collect::<Vec<_>>();
-
-        let Some(jsons) = names
-            .iter()
-            .map(|(_, cell)| match &cell.value {
-                CellValue::String(str) => Some(str),
-                _ => None,
-            })
-            .collect::<Option<Vec<_>>>()
-        else {
-            return Ok(vec![]);
-        };
-
-        let families = jsons
-            .iter()
-            .map(|value| serde_json::from_str(value).expect("should be valid json"))
-            .collect();
-
-        Ok(families)
-    } */
-
     pub fn delete_user_table(&self, table_name: &str) -> fjall::Result<()> {
-        self.tree.remove(format!("table:{table_name}:name"))?;
+        self.tree.remove(format!("table#{table_name}#name"))?;
         Ok(())
     }
 }

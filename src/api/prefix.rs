@@ -13,7 +13,6 @@ use actix_web::{
     HttpResponse,
 };
 use serde_json::json;
-use std::ops::Deref;
 
 #[post("/v1/table/{name}/prefix")]
 pub async fn handler(
@@ -58,16 +57,16 @@ pub async fn handler(
             Some(micros_total / result.rows.len() as u128)
         };
 
-        TableWriter::write_raw(
-            app_state.metrics_table.deref().clone(),
-            &RowWriteItem {
-                row_key: format!("t#{table_name}"),
+        TableWriter::write_batch(
+            table.metrics.clone(),
+            &[RowWriteItem {
+                row_key: "lat#read#pfx".to_string(),
                 cells: vec![ColumnWriteItem {
-                    column_key: ColumnKey::try_from("lat:r#pfx").expect("should be column key"),
+                    column_key: ColumnKey::try_from("value").expect("should be column key"),
                     timestamp: None,
                     value: CellValue::F64(micros_total as f64),
                 }],
-            },
+            }],
         )
         .ok();
 

@@ -195,89 +195,44 @@ function StackedAreaChart(props: { yFormatter: (x: any) => string; title: string
   />
 }
 
-function App() {
-  const [sysRow, _] = createSignal(JSON.parse(document.getElementById("system-metrics-data")!.textContent!));
-  const [tableRows, __] = createSignal(JSON.parse(document.getElementById("disk-usage-data")!.textContent!));
-  const [latencyRows, ___] = createSignal(JSON.parse(document.getElementById("latency-data")!.textContent!));
+function extractTimeseries(tableStatsMap: any, name: string) {
+  return Object.entries<any>(tableStatsMap).map(([tableName, rows]) => ({
+    name: tableName,
+    data: (rows.find(r => r.row_key === name)?.columns.value[""] ?? []).map(({ timestamp, value: { F64: bytes } }) => ({
+      x: new Date(timestamp / 1000 / 1000),
+      y: bytes,
+    }))
+  })).filter(({ data }) => data.length > 0)
+}
 
-  const cpu = () => sysRow().columns.stats.cpu.map(({ timestamp, value: { F64: pct } }) => ({
+function App() {
+  const [sysRows, _] = createSignal(JSON.parse(document.getElementById("system-metrics-data")!.textContent!));
+  const [tableStatsMap, __] = createSignal(JSON.parse(document.getElementById("table-stats-data")!.textContent!));
+
+  const cpu = () => (sysRows().find(x => x.row_key === "sys#cpu")?.columns.value[""] ?? []).map(({ timestamp, value: { F64: pct } }) => ({
     x: new Date(timestamp / 1000 / 1000),
     y: pct,
   }));
 
-  const mem = () => sysRow().columns.stats.mem.map(({ timestamp, value: { F64: bytes } }) => ({
+  const mem = () => (sysRows().find(x => x.row_key === "sys#mem")?.columns.value[""] ?? []).map(({ timestamp, value: { F64: bytes } }) => ({
     x: new Date(timestamp / 1000 / 1000),
     y: bytes,
   }));
 
-  const journalCount = () => sysRow().columns.stats.wal_cnt.map(({ timestamp, value: { U8: y } }) => ({
+  const journalCount = () => (sysRows().find(x => x.row_key === "wal#len")?.columns.value[""] ?? []).map(({ timestamp, value: { Byte: y } }) => ({
     x: new Date(timestamp / 1000 / 1000),
     y,
   }));
 
-  const tablesDiskUsage = () => tableRows().map((row) => ({
-    name: row.row_key.replace("t#", "").replace("usr_", ""),
-    data: (row.columns.stats.du ?? []).map(({ timestamp, value: { F64: bytes } }) => ({
-      x: new Date(timestamp / 1000 / 1000),
-      y: bytes,
-    }))
-  })).filter(({ data }) => data.length > 0);
-
-  const segmentCounts = () => tableRows().map((row) => ({
-    name: row.row_key.replace("t#", "").replace("usr_", ""),
-    data: (row.columns.stats.seg_cnt ?? []).map(({ timestamp, value: { F64: count } }) => ({
-      x: new Date(timestamp / 1000 / 1000),
-      y: count,
-    }))
-  })).filter(({ data }) => data.length > 0);
-
-  const rowCounts = () => tableRows().map((row) => ({
-    name: row.row_key.replace("t#", "").replace("usr_", ""),
-    data: (row.columns.stats.row_cnt ?? []).map(({ timestamp, value: { F64: count } }) => ({
-      x: new Date(timestamp / 1000 / 1000),
-      y: count,
-    }))
-  })).filter(({ data }) => data.length > 0);
-
-  const cellCounts = () => tableRows().map((row) => ({
-    name: row.row_key.replace("t#", "").replace("usr_", ""),
-    data: (row.columns.stats.cell_cnt ?? []).map(({ timestamp, value: { F64: count } }) => ({
-      x: new Date(timestamp / 1000 / 1000),
-      y: count,
-    }))
-  })).filter(({ data }) => data.length > 0);
-
-  const tablesWriteLatency = () => latencyRows().map((row) => ({
-    name: row.row_key.replace("t#", "").replace("usr_", ""),
-    data: (row.columns.lat["w"] ?? []).map(({ timestamp, value: { F64: bytes } }) => ({
-      x: new Date(timestamp / 1000 / 1000),
-      y: bytes,
-    }))
-  })).filter(({ data }) => data.length > 0);
-
-  const tablesPointReadLatency = () => latencyRows().map((row) => ({
-    name: row.row_key.replace("t#", "").replace("usr_", ""),
-    data: (row.columns.lat["r#row"] ?? []).map(({ timestamp, value: { F64: bytes } }) => ({
-      x: new Date(timestamp / 1000 / 1000),
-      y: bytes,
-    }))
-  })).filter(({ data }) => data.length > 0);
-
-  const tablesPrefixLatency = () => latencyRows().map((row) => ({
-    name: row.row_key.replace("t#", "").replace("usr_", ""),
-    data: (row.columns.lat["r#pfx"] ?? []).map(({ timestamp, value: { F64: bytes } }) => ({
-      x: new Date(timestamp / 1000 / 1000),
-      y: bytes,
-    }))
-  })).filter(({ data }) => data.length > 0);
-
-  const tablesDeletesLatency = () => latencyRows().map((row) => ({
-    name: row.row_key.replace("t#", "").replace("usr_", ""),
-    data: (row.columns.lat["del#row"] ?? []).map(({ timestamp, value: { F64: bytes } }) => ({
-      x: new Date(timestamp / 1000 / 1000),
-      y: bytes,
-    }))
-  })).filter(({ data }) => data.length > 0);
+  const writeLatency = () => extractTimeseries(tableStatsMap(), "lat#write#batch");
+  const rowReadLatency = () => extractTimeseries(tableStatsMap(), "lat#read#row");
+  const prefixLatency = () => extractTimeseries(tableStatsMap(), "lat#read#pfx");
+  const rowDeleteLatency = () => extractTimeseries(tableStatsMap(), "lat#del#row");
+  const diskUsage = () => extractTimeseries(tableStatsMap(), "stats#du");
+  const segmentCount = () => extractTimeseries(tableStatsMap(), "stats#seg_cnt");
+  const rowCount = () => extractTimeseries(tableStatsMap(), "stats#row_cnt");
+  const cellCount = () => extractTimeseries(tableStatsMap(), "stats#cell_cnt");
+  const gcDeleteCount = () => extractTimeseries(tableStatsMap(), "gc#del_cnt");
 
   onMount(() => {
     setTimeout(() => window.location.reload(), 60 * 1000)
@@ -288,7 +243,7 @@ function App() {
       <div class="text-center text-xl text-white">
         Smoltable
       </div>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid sm:grid-cols-2 gap-3">
         <LineChart
           title="CPU usage (system)"
           yFormatter={(n) => `${Math.round(n)} %`}
@@ -323,7 +278,7 @@ function App() {
           title="Disk usage"
           yFormatter={prettyBytes}
           series={[
-            ...tablesDiskUsage(),
+            ...diskUsage(),
           ]}
         />
         <LineChart
@@ -338,7 +293,7 @@ function App() {
             return `${(x / 1_000 / 1_000)}M`;
           }}
           series={[
-            ...segmentCounts(),
+            ...segmentCount(),
           ]}
         />
         <LineChart
@@ -353,7 +308,7 @@ function App() {
             return `${(x / 1_000 / 1_000)}M`;
           }}
           series={[
-            ...rowCounts(),
+            ...rowCount(),
           ]}
         />
         <LineChart
@@ -368,7 +323,7 @@ function App() {
             return `${(x / 1_000 / 1_000)}M`;
           }}
           series={[
-            ...cellCounts(),
+            ...cellCount(),
           ]}
         />
         <LineChart
@@ -384,12 +339,12 @@ function App() {
             return `${(x / 1000 / 1000).toFixed(2)} s`
           }}
           series={[
-            ...tablesWriteLatency(),
+            ...writeLatency(),
           ]}
         />
         <LineChart
           alwaysShowLegend
-          title="Point read latency"
+          title="Row read latency"
           yFormatter={x => {
             if (x < 1_000) {
               return `${x} µs`
@@ -400,12 +355,12 @@ function App() {
             return `${(x / 1000 / 1000).toFixed(2)} s`
           }}
           series={[
-            ...tablesPointReadLatency(),
+            ...rowReadLatency(),
           ]}
         />
         <LineChart
           alwaysShowLegend
-          title="Scan latency"
+          title="Prefix scan latency"
           yFormatter={x => {
             if (x < 1_000) {
               return `${x} µs`
@@ -416,7 +371,7 @@ function App() {
             return `${(x / 1000 / 1000).toFixed(2)} s`
           }}
           series={[
-            ...tablesPrefixLatency(),
+            ...prefixLatency(),
           ]}
         />
         <LineChart
@@ -432,7 +387,23 @@ function App() {
             return `${(x / 1000 / 1000).toFixed(2)} s`
           }}
           series={[
-            ...tablesDeletesLatency(),
+            ...rowDeleteLatency(),
+          ]}
+        />
+        <LineChart
+          alwaysShowLegend
+          title="Cell GC delete count"
+          yFormatter={x => {
+            if (x < 1_000) {
+              return x;
+            }
+            if (x < 1_000_000) {
+              return `${(x / 1_000)}k`;
+            }
+            return `${(x / 1_000 / 1_000)}M`;
+          }}
+          series={[
+            ...gcDeleteCount(),
           ]}
         />
       </div>

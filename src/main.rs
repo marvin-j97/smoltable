@@ -13,23 +13,23 @@ use crate::env::{data_folder, get_port};
 use actix_web::{
     http::header::ContentType, middleware::Logger, web, App, HttpResponse, HttpServer,
 };
-use app_state::AppState;
+use app_state::{AppState, MonitoredSmoltable};
 use column_key::ColumnKey;
 use error::CustomRouteResult;
 use manifest::ManifestTable;
 use metrics::MetricsTable;
-use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use sysinfo::SystemExt;
 use table::{
     single_row_reader::{QueryRowInput, QueryRowInputColumnOptions, QueryRowInputRowOptions},
     writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter},
-    ColumnFamilyDefinition, CreateColumnFamilyInput, Smoltable,
+    ColumnFamilyDefinition, CreateColumnFamilyInput, GarbageCollectionOptions, Smoltable,
 };
 use tokio::sync::RwLock;
 
 async fn recover_tables(
     manifest_table: &ManifestTable,
-) -> fjall::Result<HashMap<String, Smoltable>> {
+) -> fjall::Result<HashMap<String, MonitoredSmoltable>> {
     log::info!("Recovering user tables");
 
     let mut tables = HashMap::default();
@@ -42,7 +42,19 @@ async fn recover_tables(
         log::debug!("Recovering user table {table_name}");
 
         let recovered_table = Smoltable::open(&table_name, manifest_table.keyspace.clone())?;
-        tables.insert(table_name, recovered_table);
+        let metrics_table = MetricsTable::open(
+            manifest_table.keyspace.clone(),
+            &format!("_mtx_{table_name}"),
+        )
+        .await?;
+
+        tables.insert(
+            table_name,
+            MonitoredSmoltable {
+                inner: recovered_table,
+                metrics: metrics_table,
+            },
+        );
     }
 
     log::info!("Recovered {} tables", tables.len());
@@ -50,72 +62,160 @@ async fn recover_tables(
     Ok(tables)
 }
 
-// TODO: metrics of user tables should be stored in separate metrics tables
-
 async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse> {
     let start = std::time::Instant::now();
 
-    // TODO: 1 row per timeseries
-    // TODO: change how metrics are stored, 1 metric table per user table etc...
+    let system_metrics = data.system_metrics_table.multi_get(vec![
+        QueryRowInput {
+            row: QueryRowInputRowOptions {
+                key: "sys#cpu".into(),
+            },
+            column: Some(QueryRowInputColumnOptions {
+                filter: Some(table::ColumnFilter::Key(
+                    ColumnKey::try_from("value:").expect("should be valid column key"),
+                )),
+                cell_limit: Some(1_440 / 2),
+            }),
+        },
+        QueryRowInput {
+            row: QueryRowInputRowOptions {
+                key: "sys#mem".into(),
+            },
+            column: Some(QueryRowInputColumnOptions {
+                filter: Some(table::ColumnFilter::Key(
+                    ColumnKey::try_from("value:").expect("should be valid column key"),
+                )),
+                cell_limit: Some(1_440 / 2),
+            }),
+        },
+        QueryRowInput {
+            row: QueryRowInputRowOptions {
+                key: "wal#len".into(),
+            },
+            column: Some(QueryRowInputColumnOptions {
+                filter: Some(table::ColumnFilter::Key(
+                    ColumnKey::try_from("value:").expect("should be valid column key"),
+                )),
+                cell_limit: Some(1_440 / 2),
+            }),
+        },
+    ])?;
 
-    let system_metrics = data.metrics_table.multi_get(vec![QueryRowInput {
-        row: QueryRowInputRowOptions { key: "sys".into() },
-        // cell: None,
-        column: Some(QueryRowInputColumnOptions {
-            filter: Some(table::ColumnFilter::Key(
-                ColumnKey::try_from("stats:").expect("should be valid column key"),
-            )),
-            cell_limit: Some(1_440 / 2),
-        }),
-    }])?;
-
-    let table_names = data
-        .tables
-        .read()
-        .await
-        .keys()
-        .map(|x| format!("t#{x}"))
+    let user_tables_lock = data.tables.read().await;
+    let user_tables = user_tables_lock
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
         .collect::<Vec<_>>();
+    drop(user_tables_lock);
 
-    let disk_usage = data.metrics_table.multi_get(
-        table_names
-            .iter()
-            .map(|name| {
+    let table_stats = user_tables
+        .iter()
+        .map(|(table_name, table)| {
+            let result = table.metrics.multi_get(vec![
                 QueryRowInput {
                     row: QueryRowInputRowOptions {
-                        key: name.to_owned(),
+                        key: "lat#write#batch".into(),
                     },
-                    // cell: None,
                     column: Some(QueryRowInputColumnOptions {
                         filter: Some(table::ColumnFilter::Key(
-                            ColumnKey::try_from("stats:").expect("should be valid column key"),
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
-                }
-            })
-            .collect::<Vec<_>>(),
-    )?;
-
-    let latency = data.metrics_table.multi_get(
-        table_names
-            .iter()
-            .map(|name| {
+                },
                 QueryRowInput {
                     row: QueryRowInputRowOptions {
-                        key: name.to_owned(),
+                        key: "lat#read#pfx".into(),
                     },
-                    // cell: NOne
                     column: Some(QueryRowInputColumnOptions {
                         filter: Some(table::ColumnFilter::Key(
-                            ColumnKey::try_from("lat:").expect("should be valid column key"),
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
-                }
-            })
-            .collect::<Vec<_>>(),
-    )?;
+                },
+                QueryRowInput {
+                    row: QueryRowInputRowOptions {
+                        key: "lat#read#row".into(),
+                    },
+                    column: Some(QueryRowInputColumnOptions {
+                        filter: Some(table::ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
+                        )),
+                        cell_limit: Some(1_440 / 2),
+                    }),
+                },
+                QueryRowInput {
+                    row: QueryRowInputRowOptions {
+                        key: "lat#del#row".into(),
+                    },
+                    column: Some(QueryRowInputColumnOptions {
+                        filter: Some(table::ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
+                        )),
+                        cell_limit: Some(1_440 / 2),
+                    }),
+                },
+                QueryRowInput {
+                    row: QueryRowInputRowOptions {
+                        key: "stats#du".into(),
+                    },
+                    column: Some(QueryRowInputColumnOptions {
+                        filter: Some(table::ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
+                        )),
+                        cell_limit: Some(1_440 / 2),
+                    }),
+                },
+                QueryRowInput {
+                    row: QueryRowInputRowOptions {
+                        key: "stats#seg_cnt".into(),
+                    },
+                    column: Some(QueryRowInputColumnOptions {
+                        filter: Some(table::ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
+                        )),
+                        cell_limit: Some(1_440 / 2),
+                    }),
+                },
+                QueryRowInput {
+                    row: QueryRowInputRowOptions {
+                        key: "stats#row_cnt".into(),
+                    },
+                    column: Some(QueryRowInputColumnOptions {
+                        filter: Some(table::ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
+                        )),
+                        cell_limit: Some(1_440 / 2),
+                    }),
+                },
+                QueryRowInput {
+                    row: QueryRowInputRowOptions {
+                        key: "stats#cell_cnt".into(),
+                    },
+                    column: Some(QueryRowInputColumnOptions {
+                        filter: Some(table::ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
+                        )),
+                        cell_limit: Some(1_440 / 2),
+                    }),
+                },
+                QueryRowInput {
+                    row: QueryRowInputRowOptions {
+                        key: "gc#del_cnt".into(),
+                    },
+                    column: Some(QueryRowInputColumnOptions {
+                        filter: Some(table::ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
+                        )),
+                        cell_limit: Some(1_440 / 2),
+                    }),
+                },
+            ])?;
+
+            Ok((table_name.clone(), result.rows))
+        })
+        .collect::<fjall::Result<HashMap<_, _>>>()?;
 
     let html = if cfg!(debug_assertions) {
         // NOTE: Enable hot reload in debug mode
@@ -127,21 +227,17 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
     let html = html
         .replace(
             "{{system_metrics}}",
-            &serde_json::to_string(&system_metrics.rows.first().unwrap())
-                .expect("should serialize"),
+            &serde_json::to_string(&system_metrics.rows).expect("should serialize"),
         )
         .replace(
-            "{{disk_usage}}",
-            &serde_json::to_string(&disk_usage.rows).expect("should serialize"),
-        )
-        .replace(
-            "{{latency}}",
-            &serde_json::to_string(&latency.rows).expect("should serialize"),
-        )
-        .replace(
-            "{{render_time_ms}}",
-            &start.elapsed().as_millis().to_string(),
+            "{{table_stats}}",
+            &serde_json::to_string(&table_stats).expect("should serialize"),
         );
+
+    let html = html.replace(
+        "{{render_time_ms}}",
+        &start.elapsed().as_millis().to_string(),
+    );
 
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
@@ -165,14 +261,12 @@ async fn main() -> fjall::Result<()> {
         .open()?;
 
     let manifest_table = ManifestTable::open(keyspace.clone())?;
-    let mut tables = recover_tables(&manifest_table).await?;
+    let tables = recover_tables(&manifest_table).await?;
 
-    let metrics_table = {
-        let existed_before = keyspace.partition_exists("_metrics");
+    let system_metrics_table = {
+        let existed_before = keyspace.partition_exists("_man__metrics");
 
-        let table = MetricsTable::create_new(keyspace.clone()).await?;
-
-        tables.insert("_metrics".into(), table.deref().clone());
+        let table = MetricsTable::open(keyspace.clone(), "_metrics").await?;
 
         if !existed_before {
             manifest_table.persist_user_table("_metrics")?;
@@ -180,12 +274,25 @@ async fn main() -> fjall::Result<()> {
             table.create_column_families(&CreateColumnFamilyInput {
                 column_families: vec![
                     ColumnFamilyDefinition {
+                        name: "value".into(),
+                        gc_settings: GarbageCollectionOptions {
+                            ttl_secs: None,
+                            version_limit: None,
+                        },
+                    },
+                    ColumnFamilyDefinition {
                         name: "stats".into(),
-                        version_limit: None,
+                        gc_settings: GarbageCollectionOptions {
+                            ttl_secs: None,
+                            version_limit: None,
+                        },
                     },
                     ColumnFamilyDefinition {
                         name: "lat".into(),
-                        version_limit: None,
+                        gc_settings: GarbageCollectionOptions {
+                            ttl_secs: None,
+                            version_limit: None,
+                        },
                     },
                 ],
                 locality_group: None,
@@ -199,50 +306,95 @@ async fn main() -> fjall::Result<()> {
     let tables = Arc::new(RwLock::new(tables));
 
     {
-        let keyspace = keyspace.clone();
-        let metrics_table = metrics_table.clone();
         let tables = tables.clone();
 
-        log::debug!("Starting row counting worker");
+        log::info!("Starting TTL worker");
+
+        // Start TTL worker
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(15)).await;
+
+            loop {
+                let tables_lock = tables.read().await;
+                let tables = tables_lock.clone();
+                drop(tables_lock);
+
+                for (table_name, table) in tables {
+                    log::debug!("Running TTL worker on {table_name:?}");
+
+                    match table.run_version_gc() {
+                        Ok(deleted_count) => {
+                            log::info!("Cell GC deleted {deleted_count} cells in {table_name:?}");
+
+                            TableWriter::write_batch(
+                                table.metrics.clone(),
+                                &[RowWriteItem {
+                                    row_key: "gc#del_cnt".to_string(),
+                                    cells: vec![ColumnWriteItem {
+                                        column_key: ColumnKey::try_from("value")
+                                            .expect("should be column key"),
+                                        timestamp: None,
+                                        value: table::cell::Value::F64(deleted_count as f64),
+                                    }],
+                                }],
+                            )
+                            .ok();
+                        }
+                        Err(e) => {
+                            log::error!("Error during cell GC: {e:?}");
+                        }
+                    };
+                }
+
+                log::info!("TTL worker done");
+                tokio::time::sleep(Duration::from_secs(/* 24 hours*/ 21_600 * 4)).await;
+            }
+        });
+    }
+
+    {
+        let keyspace = keyspace.clone();
+        let tables = tables.clone();
+
+        log::info!("Starting row counting worker");
 
         // Start row counting worker
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_secs(15)).await;
 
             loop {
-                let tables = tables.read().await;
+                let tables_lock = tables.read().await;
+                let tables = tables_lock.clone();
+                drop(tables_lock);
 
                 let before = std::time::Instant::now();
 
-                for (table_name, table) in tables.iter() {
+                for (table_name, table) in tables {
                     log::debug!("Counting {table_name}");
 
                     if let Ok((row_count, cell_count)) = table.count() {
-                        TableWriter::write_raw(
-                            metrics_table.deref().clone(),
-                            &RowWriteItem {
-                                row_key: format!("t#{table_name}"),
-                                cells: vec![ColumnWriteItem {
-                                    column_key: ColumnKey::try_from("stats:row_cnt")
-                                        .expect("should be column key"),
-                                    timestamp: None,
-                                    value: table::cell::Value::F64(row_count as f64),
-                                }],
-                            },
-                        )
-                        .ok();
-
-                        TableWriter::write_raw(
-                            metrics_table.deref().clone(),
-                            &RowWriteItem {
-                                row_key: format!("t#{table_name}"),
-                                cells: vec![ColumnWriteItem {
-                                    column_key: ColumnKey::try_from("stats:cell_cnt")
-                                        .expect("should be column key"),
-                                    timestamp: None,
-                                    value: table::cell::Value::F64(cell_count as f64),
-                                }],
-                            },
+                        TableWriter::write_batch(
+                            table.metrics.clone(),
+                            &[
+                                RowWriteItem {
+                                    row_key: "stats#row_cnt".to_string(),
+                                    cells: vec![ColumnWriteItem {
+                                        column_key: ColumnKey::try_from("value")
+                                            .expect("should be column key"),
+                                        timestamp: None,
+                                        value: table::cell::Value::F64(row_count as f64),
+                                    }],
+                                },
+                                RowWriteItem {
+                                    row_key: "stats#cell_cnt".to_string(),
+                                    cells: vec![ColumnWriteItem {
+                                        column_key: ColumnKey::try_from("value")
+                                            .expect("should be column key"),
+                                        timestamp: None,
+                                        value: table::cell::Value::F64(cell_count as f64),
+                                    }],
+                                },
+                            ],
                         )
                         .ok();
                     }
@@ -250,18 +402,17 @@ async fn main() -> fjall::Result<()> {
                     log::debug!("Counted {table_name}");
                 }
 
-                drop(tables);
-
                 keyspace.persist().unwrap();
 
                 let time_s = before.elapsed().as_secs();
+
+                log::info!("Counting worker done");
 
                 let sleep_time = match time_s {
                     _ if time_s < 5 => 60,
                     _ if time_s < 60 => 3_600,
                     _ => 21_600, // 6 hours
                 };
-
                 tokio::time::sleep(Duration::from_secs(sleep_time)).await;
             }
         });
@@ -269,10 +420,10 @@ async fn main() -> fjall::Result<()> {
 
     {
         let keyspace = keyspace.clone();
-        let metrics_table = metrics_table.clone();
+        let system_metrics_table = system_metrics_table.clone();
         let tables = tables.clone();
 
-        log::debug!("Starting system metrics worker");
+        log::info!("Starting system metrics worker");
 
         // Start metrics worker
         tokio::spawn(async move {
@@ -283,68 +434,79 @@ async fn main() -> fjall::Result<()> {
 
                 let sysinfo = sysinfo::System::new_all();
 
-                let tables = tables.read().await;
+                let tables_lock = tables.read().await;
+                let tables = tables_lock.clone();
+                drop(tables_lock);
 
-                for (table_name, table) in tables.iter() {
+                for (_, table) in tables {
                     let folder_size = table.disk_space_usage();
                     let segment_count = table.segment_count();
 
-                    TableWriter::write_raw(
-                        metrics_table.deref().clone(),
-                        &RowWriteItem {
-                            row_key: format!("t#{table_name}"),
-                            cells: vec![
-                                ColumnWriteItem {
-                                    column_key: ColumnKey::try_from("stats:seg_cnt")
+                    TableWriter::write_batch(
+                        table.metrics.clone(),
+                        &[
+                            RowWriteItem {
+                                row_key: "stats#seg_cnt".to_string(),
+                                cells: vec![ColumnWriteItem {
+                                    column_key: ColumnKey::try_from("value")
                                         .expect("should be column key"),
                                     timestamp: None,
                                     value: table::cell::Value::F64(segment_count as f64),
-                                },
-                                ColumnWriteItem {
-                                    column_key: ColumnKey::try_from("stats:du")
+                                }],
+                            },
+                            RowWriteItem {
+                                row_key: "stats#du".to_string(),
+                                cells: vec![ColumnWriteItem {
+                                    column_key: ColumnKey::try_from("value")
                                         .expect("should be column key"),
                                     timestamp: None,
                                     value: table::cell::Value::F64(folder_size as f64),
-                                },
-                            ],
-                        },
+                                }],
+                            },
+                        ],
                     )
                     .ok();
                 }
-                drop(tables);
 
                 let journal_count = keyspace.journal_count();
 
-                TableWriter::write_raw(
-                    metrics_table.deref().clone(),
-                    &RowWriteItem {
-                        row_key: "sys".to_string(),
-                        cells: vec![
-                            ColumnWriteItem {
-                                column_key: ColumnKey::try_from("stats:cpu")
+                TableWriter::write_batch(
+                    system_metrics_table.clone(),
+                    &[
+                        RowWriteItem {
+                            row_key: "sys#cpu".to_string(),
+                            cells: vec![ColumnWriteItem {
+                                column_key: ColumnKey::try_from("value")
                                     .expect("should be column key"),
                                 timestamp: None,
                                 value: table::cell::Value::F64(sysinfo.load_average().one),
-                            },
-                            ColumnWriteItem {
-                                column_key: ColumnKey::try_from("stats:mem")
+                            }],
+                        },
+                        RowWriteItem {
+                            row_key: "sys#mem".to_string(),
+                            cells: vec![ColumnWriteItem {
+                                column_key: ColumnKey::try_from("value")
                                     .expect("should be column key"),
                                 timestamp: None,
                                 value: table::cell::Value::F64(sysinfo.used_memory() as f64),
-                            },
-                            ColumnWriteItem {
-                                column_key: ColumnKey::try_from("stats:wal_cnt")
+                            }],
+                        },
+                        RowWriteItem {
+                            row_key: "wal#len".to_string(),
+                            cells: vec![ColumnWriteItem {
+                                column_key: ColumnKey::try_from("value")
                                     .expect("should be column key"),
                                 timestamp: None,
                                 value: table::cell::Value::Byte(journal_count as u8),
-                            },
-                        ],
-                    },
+                            }],
+                        },
+                    ],
                 )
                 .ok();
 
                 keyspace.persist().unwrap();
 
+                log::info!("System metrics worker done");
                 tokio::time::sleep(Duration::from_secs(60)).await;
             }
         });
@@ -353,7 +515,7 @@ async fn main() -> fjall::Result<()> {
     let app_state = web::Data::new(AppState {
         keyspace,
         manifest_table,
-        metrics_table,
+        system_metrics_table,
         tables,
         block_cache,
     });

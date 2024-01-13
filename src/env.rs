@@ -14,7 +14,7 @@ pub fn get_port() -> u16 {
 }
 
 pub fn metrics_cap_mb() -> u16 {
-    let port = std::env::var("SMOLTABLE_METRICS_CAP_MB").unwrap_or("100".into());
+    let port = std::env::var("SMOLTABLE_METRICS_CAP_MB").unwrap_or("10".into());
 
     port.parse::<u16>()
         .expect("invalid metrics cap MB setting, can be up to 65536")

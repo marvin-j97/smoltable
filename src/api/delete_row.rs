@@ -13,7 +13,6 @@ use actix_web::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use std::ops::Deref;
 
 #[derive(Debug, Deserialize)]
 pub struct Input {
@@ -21,9 +20,9 @@ pub struct Input {
     // column_filter: Option<ColumnKey>,
 }
 
-// TODO: change input format
+// TODO: change input format to Vec, atomic multi-row deletes...?
 
-#[delete("/v1/table/{name}/row")]
+#[delete("/v1/table/{name}/rows")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
@@ -62,18 +61,29 @@ pub async fn handler(
             None
         } else {
             Some(micros_total / count as u128)
-        };
+        }
+        .unwrap_or_default();
 
-        TableWriter::write_raw(
-            app_state.metrics_table.deref().clone(),
-            &RowWriteItem {
-                row_key: format!("t#{table_name}"),
-                cells: vec![ColumnWriteItem {
-                    column_key: ColumnKey::try_from("lat:del#row").expect("should be column key"),
-                    timestamp: None,
-                    value: CellValue::F64(micros_total as f64),
-                }],
-            },
+        TableWriter::write_batch(
+            table.metrics.clone(),
+            &[
+                RowWriteItem {
+                    row_key: "lat#del#row".to_string(),
+                    cells: vec![ColumnWriteItem {
+                        column_key: ColumnKey::try_from("value").expect("should be column key"),
+                        timestamp: None,
+                        value: CellValue::F64(micros_total as f64),
+                    }],
+                },
+                RowWriteItem {
+                    row_key: "lat#del#cell".to_string(),
+                    cells: vec![ColumnWriteItem {
+                        column_key: ColumnKey::try_from("value").expect("should be column key"),
+                        timestamp: None,
+                        value: CellValue::F64(micros_per_item as f64),
+                    }],
+                },
+            ],
         )
         .ok();
 

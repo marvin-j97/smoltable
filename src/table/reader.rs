@@ -5,6 +5,7 @@ use std::{collections::VecDeque, ops::Bound};
 
 /// Stupidly iterates through a prefixed set of cells
 pub struct Reader {
+    pub partition: PartitionHandle,
     snapshot: Snapshot,
     prefix: String,
     range: Option<(Bound<Vec<u8>>, Bound<Vec<u8>>)>,
@@ -22,6 +23,7 @@ impl Reader {
         let snapshot = locality_group.snapshot_at(instant);
 
         Self {
+            partition: locality_group,
             snapshot,
             prefix,
             range: None,

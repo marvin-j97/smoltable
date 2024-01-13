@@ -1,5 +1,5 @@
 // Define the allowed characters
-const ALLOWED_CHARS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_#$.";
+const ALLOWED_CHARS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
 
 pub fn is_valid_identifier(s: &str) -> bool {
     // Check if all characters in the string are allowed

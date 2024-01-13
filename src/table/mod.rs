@@ -9,8 +9,11 @@ use self::{
     single_row_reader::{QueryRowInput, QueryRowInputRowOptions, SingleRowReader},
 };
 use crate::{
-    column_key::ColumnKey,
-    table::{merge_reader::MergeReader, single_row_reader::get_affected_locality_groups},
+    column_key::{ColumnKey, ParsedColumnKey},
+    table::{
+        merge_reader::MergeReader, single_row_reader::get_affected_locality_groups,
+        writer::timestamp_nano,
+    },
 };
 use fjall::{Batch, Keyspace, PartitionHandle};
 use serde::{Deserialize, Serialize};
@@ -97,14 +100,18 @@ impl LocalityGroup {
     }
 }
 
+// TODO: metrics
+
 pub struct SmoltableInner {
+    /// Name
+    pub name: Arc<str>,
+
     /// Keyspace
     pub keyspace: Keyspace,
 
     /// Manifest partition
     pub manifest: PartitionHandle,
 
-    // TODO: metrics
     /// Default locality group
     pub tree: PartitionHandle,
 
@@ -179,9 +186,15 @@ pub struct QueryRowOutput {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct GarbageCollectionOptions {
+    pub version_limit: Option<u64>,
+    pub ttl_secs: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ColumnFamilyDefinition {
     pub name: String,
-    pub version_limit: Option<u64>,
+    pub gc_settings: GarbageCollectionOptions,
 }
 
 #[derive(Debug, Deserialize)]
@@ -191,7 +204,13 @@ pub struct CreateColumnFamilyInput {
 }
 
 impl Smoltable {
-    pub fn open(name: &str, keyspace: Keyspace) -> fjall::Result<Smoltable> {
+    /// Creates a Smoltable, setting the compaction strategy of its
+    /// main partition to the given compaction strategy
+    pub fn with_strategy(
+        name: &str,
+        keyspace: Keyspace,
+        strategy: Arc<dyn fjall::compaction::Strategy + Send + Sync>,
+    ) -> fjall::Result<Smoltable> {
         let manifest = {
             let config = fjall::PartitionCreateOptions::default().level_count(2);
             let tree = keyspace.open_partition(&format!("_man_{name}"), config)?;
@@ -205,14 +224,12 @@ impl Smoltable {
         let tree = {
             let config = fjall::PartitionCreateOptions::default().block_size(BLOCK_SIZE);
             let tree = keyspace.open_partition(&format!("_dat_{name}"), config)?;
-            tree.set_compaction_strategy(Arc::new(fjall::compaction::Levelled {
-                target_size: 64 * 1_024 * 1_024,
-                l0_threshold: 4,
-            }));
+            tree.set_compaction_strategy(strategy);
             tree
         };
 
         let table = SmoltableInner {
+            name: name.into(),
             keyspace,
             tree,
             manifest,
@@ -223,6 +240,17 @@ impl Smoltable {
         table.load_locality_groups()?;
 
         Ok(table)
+    }
+
+    pub fn open(name: &str, keyspace: Keyspace) -> fjall::Result<Smoltable> {
+        Self::with_strategy(
+            name,
+            keyspace,
+            Arc::new(fjall::compaction::Levelled {
+                target_size: 64 * 1_024 * 1_024,
+                l0_threshold: 4,
+            }),
+        )
     }
 
     pub(crate) fn get_partition_for_column_family(
@@ -367,6 +395,107 @@ impl Smoltable {
         }
 
         Ok((row_count, cell_count))
+    }
+
+    // TODO: unit test
+    pub fn run_version_gc(&self) -> fjall::Result<u64> {
+        use reader::Reader as TableReader;
+
+        let gc_options_map = self
+            .list_column_families()?
+            .into_iter()
+            .map(|x| (x.name, x.gc_settings))
+            .collect::<HashMap<_, _>>();
+
+        if gc_options_map
+            .iter()
+            .all(|(_, x)| x.ttl_secs.is_none() && x.version_limit.is_none())
+        {
+            // NOTE: Short circuit because no GC defined for any column family
+            log::info!("{} has no column families with GC, skipping", self.name);
+            return Ok(0);
+        }
+
+        let mut deleted_cell_count = 0;
+
+        // TODO: ideally, we should get count per column family
+        // TODO: store in table-wide _metrics
+
+        let locality_groups_to_scan = get_affected_locality_groups(
+            self,
+            &Some(ColumnFilter::Multi(
+                gc_options_map
+                    .keys()
+                    .map(|cf| {
+                        ParsedColumnKey::try_from(cf.as_str())
+                            .expect("should be valid column family name")
+                    })
+                    .collect(),
+            )),
+        )?;
+        let instant = self.keyspace.instant();
+
+        let mut readers = locality_groups_to_scan
+            .into_iter()
+            .map(|x| TableReader::new(instant, x, "".into()))
+            .collect::<Vec<_>>();
+
+        let mut current_row_key = None;
+        let mut current_column_key = None;
+        let mut cell_count_in_column = 0;
+
+        // IMPORTANT: Can't use MergeReader because we may need to access
+        // a specific partition (locality group)
+        for mut reader in &mut readers {
+            loop {
+                let Some(cell) = reader.next() else {
+                    break;
+                };
+
+                let cell = cell?;
+
+                if current_row_key.is_none() || current_row_key.clone().unwrap() != cell.row_key {
+                    current_row_key = Some(cell.row_key.clone());
+                    cell_count_in_column = 0;
+                }
+
+                if current_column_key.is_none()
+                    || current_column_key.clone().unwrap() != cell.column_key
+                {
+                    current_column_key = Some(cell.column_key.clone());
+                    cell_count_in_column = 0;
+                }
+
+                cell_count_in_column += 1;
+
+                let Some(gc_opts) = gc_options_map.get(&cell.column_key.family) else {
+                    continue;
+                };
+
+                if let Some(version_limit) = gc_opts.version_limit {
+                    if version_limit > 0 && cell_count_in_column > version_limit {
+                        reader.partition.remove(&cell.raw_key)?;
+                        deleted_cell_count += 1;
+                    }
+                }
+
+                if let Some(ttl_secs) = gc_opts.ttl_secs {
+                    if ttl_secs > 0 && cell.timestamp > 0 {
+                        let timestamp_secs = cell.timestamp / 1_000 / 1_000 / 1_000;
+                        let timestamp_now = timestamp_nano() / 1_000 / 1_000 / 1_000;
+
+                        let lifetime = timestamp_now - timestamp_secs;
+
+                        if lifetime > u128::from(ttl_secs) {
+                            reader.partition.remove(&cell.raw_key)?;
+                            deleted_cell_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(deleted_cell_count)
     }
 
     // TODO: allow deleting specific columns -> DeleteRowInput, also batch + limit it?
@@ -679,7 +808,10 @@ mod tests {
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "value".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: None,
         })?;
@@ -744,11 +876,17 @@ mod tests {
             column_families: vec![
                 ColumnFamilyDefinition {
                     name: "value".to_owned(),
-                    version_limit: None,
+                    gc_settings: GarbageCollectionOptions {
+                        ttl_secs: None,
+                        version_limit: None,
+                    },
                 },
                 ColumnFamilyDefinition {
                     name: "another".to_owned(),
-                    version_limit: None,
+                    gc_settings: GarbageCollectionOptions {
+                        ttl_secs: None,
+                        version_limit: None,
+                    },
                 },
             ],
             locality_group: None,
@@ -832,11 +970,17 @@ mod tests {
             column_families: vec![
                 ColumnFamilyDefinition {
                     name: "value".to_owned(),
-                    version_limit: None,
+                    gc_settings: GarbageCollectionOptions {
+                        ttl_secs: None,
+                        version_limit: None,
+                    },
                 },
                 ColumnFamilyDefinition {
                     name: "another".to_owned(),
-                    version_limit: None,
+                    gc_settings: GarbageCollectionOptions {
+                        ttl_secs: None,
+                        version_limit: None,
+                    },
                 },
             ],
             locality_group: None,
@@ -913,15 +1057,24 @@ mod tests {
             column_families: vec![
                 ColumnFamilyDefinition {
                     name: "value".to_owned(),
-                    version_limit: None,
+                    gc_settings: GarbageCollectionOptions {
+                        ttl_secs: None,
+                        version_limit: None,
+                    },
                 },
                 ColumnFamilyDefinition {
                     name: "another".to_owned(),
-                    version_limit: None,
+                    gc_settings: GarbageCollectionOptions {
+                        ttl_secs: None,
+                        version_limit: None,
+                    },
                 },
                 ColumnFamilyDefinition {
                     name: "another_one".to_owned(),
-                    version_limit: None,
+                    gc_settings: GarbageCollectionOptions {
+                        ttl_secs: None,
+                        version_limit: None,
+                    },
                 },
             ],
             locality_group: None,
@@ -1016,14 +1169,20 @@ mod tests {
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "value".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: None,
         })?;
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "another".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: Some(true),
         })?;
@@ -1106,14 +1265,20 @@ mod tests {
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "value".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: None,
         })?;
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "another".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: Some(true),
         })?;
@@ -1221,21 +1386,30 @@ mod tests {
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "value".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: None,
         })?;
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "another".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: Some(true),
         })?;
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "another_one".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: Some(true),
         })?;
@@ -1351,7 +1525,10 @@ mod tests {
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "value".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: None,
         })?;
@@ -1468,7 +1645,10 @@ mod tests {
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "value".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: None,
         })?;
@@ -1553,11 +1733,17 @@ mod tests {
             column_families: vec![
                 ColumnFamilyDefinition {
                     name: "value".to_owned(),
+                    gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
                     version_limit: None,
+                },
                 },
                 ColumnFamilyDefinition {
                     name: "other".to_owned(),
+                    gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
                     version_limit: None,
+                },
                 },
             ],
             locality_group: None,
@@ -1759,11 +1945,17 @@ mod tests {
             column_families: vec![
                 ColumnFamilyDefinition {
                     name: "value".to_owned(),
+                    gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
                     version_limit: None,
+                },
                 },
                 ColumnFamilyDefinition {
                     name: "other".to_owned(),
+                    gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
                     version_limit: None,
+                },
                 },
             ],
             locality_group: None,
@@ -1933,7 +2125,10 @@ mod tests {
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "value".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: None,
         })?;
@@ -1941,7 +2136,10 @@ mod tests {
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "other".to_owned(),
-                version_limit: None,
+                gc_settings: GarbageCollectionOptions {
+                    ttl_secs: None,
+                    version_limit: None,
+                },
             }],
             locality_group: Some(true),
         })?;

@@ -55,18 +55,15 @@ pub async fn handler(
         ));
     }
 
-    if let Some(table) = tables.get(&table_name) {
-        let mut writer = TableWriter::new(table.clone());
+    if let Some(table) = tables.get(&table_name).cloned() {
+        let mut writer = TableWriter::new(table.deref().clone());
 
         drop(tables);
 
         for row in &req_body.items {
             // TODO:
-            /* for cell in &row.cells {
-                if !app_state
-                    .manifest_table
-                    .column_family_exists(&actual_name, &cell.column_key.family)?
-                {
+            /*  for cell in &row.cells {
+                if !table.column_family_exists(&actual_name, &cell.column_key.family)? {
                     return bad_request(before, "Column family does not exist");
                 }
             } */
@@ -95,22 +92,33 @@ pub async fn handler(
 
         let micros_total = dur.as_micros();
 
-        let micros_per_item = if cell_count == 0 {
+        let micros_per_cell = if cell_count == 0 {
             None
         } else {
             Some(micros_total / cell_count)
-        };
+        }
+        .unwrap_or_default();
 
-        TableWriter::write_raw(
-            app_state.metrics_table.deref().clone(),
-            &RowWriteItem {
-                row_key: format!("t#{table_name}"),
-                cells: vec![ColumnWriteItem {
-                    column_key: ColumnKey::try_from("lat:w").expect("should be column key"),
-                    timestamp: None,
-                    value: CellValue::F64(micros_total as f64),
-                }],
-            },
+        TableWriter::write_batch(
+            table.metrics.clone(),
+            &[
+                RowWriteItem {
+                    row_key: "lat#write#cell".to_string(),
+                    cells: vec![ColumnWriteItem {
+                        column_key: ColumnKey::try_from("value").expect("should be column key"),
+                        timestamp: None,
+                        value: CellValue::F64(micros_per_cell as f64),
+                    }],
+                },
+                RowWriteItem {
+                    row_key: "lat#write#batch".to_string(),
+                    cells: vec![ColumnWriteItem {
+                        column_key: ColumnKey::try_from("value").expect("should be column key"),
+                        timestamp: None,
+                        value: CellValue::F64(micros_total as f64),
+                    }],
+                },
+            ],
         )
         .ok();
 
@@ -119,7 +127,7 @@ pub async fn handler(
             StatusCode::OK,
             "Data ingestion successful",
             &json!({
-                "micros_per_item": micros_per_item,
+                "micros_per_cell": micros_per_cell,
                 "items": {
                     "row_count": req_body.items.len(),
                     "cell_count": cell_count
