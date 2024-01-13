@@ -25,7 +25,7 @@ In Bigtable, stored values are byte blobs; Smoltable supports multiple data type
 - F32 (floating point, 4 bytes)
 - F64 (floating point, 8 bytes)
 
-Column families can be grouped into locality groups, which partitions their columns into separate files, which increases scan performance over those column families (e.g. OLAP-style queries over a specific column).
+Column families can be grouped into locality groups, which partition columns into separate files, increasing scan performance over those column families (e.g. OLAP-style queries over a specific column).
 
 ## Compatibility
 
