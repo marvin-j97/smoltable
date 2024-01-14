@@ -273,7 +273,10 @@ function App() {
           title="Write buffer size"
           yFormatter={prettyBytes}
           series={[
-            ...writeBufferSize()
+            {
+              name: "Write buffer size",
+              data: writeBufferSize(),
+            }
           ]}
         />
         <LineChart
