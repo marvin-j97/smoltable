@@ -97,6 +97,17 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 cell_limit: Some(1_440 / 2),
             }),
         },
+        Input {
+            row: RowOptions {
+                key: "wbuf#size".into(),
+            },
+            column: Some(ColumnOptions {
+                filter: Some(ColumnFilter::Key(
+                    ColumnKey::try_from("value:").expect("should be valid column key"),
+                )),
+                cell_limit: Some(1_440 / 2),
+            }),
+        },
     ])?;
 
     let user_tables_lock = data.tables.read().await;
@@ -201,17 +212,6 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 Input {
                     row: RowOptions {
                         key: "gc#del_cnt".into(),
-                    },
-                    column: Some(ColumnOptions {
-                        filter: Some(ColumnFilter::Key(
-                            ColumnKey::try_from("value:").expect("should be valid column key"),
-                        )),
-                        cell_limit: Some(1_440 / 2),
-                    }),
-                },
-                Input {
-                    row: RowOptions {
-                        key: "wbuf#size".into(),
                     },
                     column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
