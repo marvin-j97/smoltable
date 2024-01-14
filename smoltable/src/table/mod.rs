@@ -289,6 +289,8 @@ impl Smoltable {
         })
     } */
 
+    // TODO: count thrashes block cache
+
     // TODO: unit test
     pub fn count(&self) -> fjall::Result<(usize, usize)> {
         use reader::Reader as TableReader;
@@ -327,6 +329,8 @@ impl Smoltable {
 
         Ok((row_count, cell_count))
     }
+
+    // TODO: GC thrashes block cache
 
     // TODO: unit test
     pub fn run_version_gc(&self) -> fjall::Result<u64> {
@@ -428,6 +432,8 @@ impl Smoltable {
 
         Ok(deleted_cell_count)
     }
+
+    // TODO: delete row thrashes block cache
 
     // TODO: allow deleting specific columns -> DeleteRowInput, also batch + limit it?
     pub fn delete_row(&self, row_key: String) -> fjall::Result<u64> {
