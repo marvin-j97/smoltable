@@ -63,6 +63,26 @@ impl std::fmt::Display for VisitedCell {
 }
 
 impl VisitedCell {
+    pub fn format_key(row_key: &str, column_key: &ColumnKey, timestamp: u128) -> Vec<u8> {
+        let mut key = format!(
+            "{}:{}:{}:",
+            row_key,
+            column_key.family,
+            column_key
+                .qualifier
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(|| String::from("")),
+        )
+        .as_bytes()
+        .to_vec();
+
+        // NOTE: Reverse the timestamp to store it in descending order
+        key.extend_from_slice(&(!timestamp).to_be_bytes());
+
+        key
+    }
+
     pub fn parse(key: Arc<[u8]>, value: &[u8]) -> VisitedCell {
         let mut buf = [0; std::mem::size_of::<u128>()];
         buf.clone_from_slice(&key[(key.len() - std::mem::size_of::<u128>())..key.len()]);
@@ -153,4 +173,24 @@ impl VisitedCell {
 pub struct Cell {
     pub timestamp: u128,
     pub value: Value,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::CellValue;
+    use test_log::test;
+
+    #[test]
+    fn cell_format_key() {
+        let key = VisitedCell::format_key("test", &ColumnKey::try_from("value:").unwrap(), 0);
+
+        let cell = VisitedCell::parse(
+            key.clone().into(),
+            &bincode::serialize(&CellValue::Byte(0)).unwrap(),
+        );
+
+        assert_eq!(cell.raw_key, key.into());
+        assert_eq!(cell.value, CellValue::Byte(0));
+    }
 }

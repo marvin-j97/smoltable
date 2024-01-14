@@ -1,28 +1,7 @@
 use super::reader::Reader as TableReader;
+use crate::query::row::Input;
 use crate::{ColumnFilter, Smoltable, VisitedCell};
 use fjall::PartitionHandle;
-use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct QueryRowInputRowOptions {
-    pub key: String,
-    // TODO: row-wide cell_limit
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct QueryRowInputColumnOptions {
-    pub cell_limit: Option<u32>,
-
-    // TODO: column limit
-    #[serde(flatten)]
-    pub filter: Option<ColumnFilter>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct QueryRowInput {
-    pub row: QueryRowInputRowOptions,
-    pub column: Option<QueryRowInputColumnOptions>,
-}
 
 pub fn get_affected_locality_groups(
     table: &Smoltable,
@@ -92,7 +71,7 @@ pub fn get_affected_locality_groups(
 
 pub struct SingleRowReader {
     inner: Option<TableReader>,
-    input: QueryRowInput,
+    input: Input,
     instant: fjall::Instant,
     locality_groups: Vec<PartitionHandle>,
     pub cells_scanned_count: u64,
@@ -100,11 +79,7 @@ pub struct SingleRowReader {
 }
 
 impl SingleRowReader {
-    pub fn new(
-        table: &Smoltable,
-        instant: fjall::Instant,
-        input: QueryRowInput,
-    ) -> fjall::Result<Self> {
+    pub fn new(table: &Smoltable, instant: fjall::Instant, input: Input) -> fjall::Result<Self> {
         let column_filter = input.column.as_ref().and_then(|x| x.filter.clone());
         let locality_groups = get_affected_locality_groups(table, &column_filter)?;
 

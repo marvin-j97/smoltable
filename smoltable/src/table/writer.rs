@@ -1,5 +1,5 @@
 use super::Smoltable;
-use crate::{CellValue, ColumnKey};
+use crate::{CellValue, ColumnKey, VisitedCell};
 use fjall::Batch;
 use serde::Deserialize;
 
@@ -49,21 +49,11 @@ impl Writer {
 
     pub fn write(&mut self, item: &RowWriteItem) -> fjall::Result<()> {
         for cell in &item.cells {
-            let mut key = format!(
-                "{}:{}:{}:",
-                item.row_key,
-                cell.column_key.family,
-                cell.column_key
-                    .qualifier
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_else(|| String::from("")),
-            )
-            .as_bytes()
-            .to_vec();
-
-            // NOTE: Reverse the timestamp to store it in descending order
-            key.extend_from_slice(&(!cell.timestamp.unwrap_or_else(timestamp_nano)).to_be_bytes());
+            let key = VisitedCell::format_key(
+                &item.row_key,
+                &cell.column_key,
+                cell.timestamp.unwrap_or_else(timestamp_nano),
+            );
 
             let encoded_value = bincode::serialize(&cell.value).expect("should serialize");
 

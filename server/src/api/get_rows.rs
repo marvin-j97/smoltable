@@ -11,7 +11,7 @@ use actix_web::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use smoltable::{QueryRowInput, TableWriter};
+use smoltable::{query::row::Input as QueryRowInput, TableWriter};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Input {

@@ -59,38 +59,38 @@ async fn recover_tables(
 }
 
 async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse> {
-    use smoltable::{QueryRowInput, QueryRowInputColumnOptions, QueryRowInputRowOptions};
+    use smoltable::query::row::{ColumnOptions, Input, RowOptions};
 
     let start = std::time::Instant::now();
 
     let system_metrics = data.system_metrics_table.multi_get(vec![
-        QueryRowInput {
-            row: QueryRowInputRowOptions {
+        Input {
+            row: RowOptions {
                 key: "sys#cpu".into(),
             },
-            column: Some(QueryRowInputColumnOptions {
+            column: Some(ColumnOptions {
                 filter: Some(ColumnFilter::Key(
                     ColumnKey::try_from("value:").expect("should be valid column key"),
                 )),
                 cell_limit: Some(1_440 / 2),
             }),
         },
-        QueryRowInput {
-            row: QueryRowInputRowOptions {
+        Input {
+            row: RowOptions {
                 key: "sys#mem".into(),
             },
-            column: Some(QueryRowInputColumnOptions {
+            column: Some(ColumnOptions {
                 filter: Some(ColumnFilter::Key(
                     ColumnKey::try_from("value:").expect("should be valid column key"),
                 )),
                 cell_limit: Some(1_440 / 2),
             }),
         },
-        QueryRowInput {
-            row: QueryRowInputRowOptions {
+        Input {
+            row: RowOptions {
                 key: "wal#len".into(),
             },
-            column: Some(QueryRowInputColumnOptions {
+            column: Some(ColumnOptions {
                 filter: Some(ColumnFilter::Key(
                     ColumnKey::try_from("value:").expect("should be valid column key"),
                 )),
@@ -110,99 +110,99 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
         .iter()
         .map(|(table_name, table)| {
             let result = table.metrics.multi_get(vec![
-                QueryRowInput {
-                    row: QueryRowInputRowOptions {
+                Input {
+                    row: RowOptions {
                         key: "lat#write#batch".into(),
                     },
-                    column: Some(QueryRowInputColumnOptions {
+                    column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
                             ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
                 },
-                QueryRowInput {
-                    row: QueryRowInputRowOptions {
+                Input {
+                    row: RowOptions {
                         key: "lat#read#pfx".into(),
                     },
-                    column: Some(QueryRowInputColumnOptions {
+                    column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
                             ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
                 },
-                QueryRowInput {
-                    row: QueryRowInputRowOptions {
+                Input {
+                    row: RowOptions {
                         key: "lat#read#row".into(),
                     },
-                    column: Some(QueryRowInputColumnOptions {
+                    column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
                             ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
                 },
-                QueryRowInput {
-                    row: QueryRowInputRowOptions {
+                Input {
+                    row: RowOptions {
                         key: "lat#del#row".into(),
                     },
-                    column: Some(QueryRowInputColumnOptions {
+                    column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
                             ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
                 },
-                QueryRowInput {
-                    row: QueryRowInputRowOptions {
+                Input {
+                    row: RowOptions {
                         key: "stats#du".into(),
                     },
-                    column: Some(QueryRowInputColumnOptions {
+                    column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
                             ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
                 },
-                QueryRowInput {
-                    row: QueryRowInputRowOptions {
+                Input {
+                    row: RowOptions {
                         key: "stats#seg_cnt".into(),
                     },
-                    column: Some(QueryRowInputColumnOptions {
+                    column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
                             ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
                 },
-                QueryRowInput {
-                    row: QueryRowInputRowOptions {
+                Input {
+                    row: RowOptions {
                         key: "stats#row_cnt".into(),
                     },
-                    column: Some(QueryRowInputColumnOptions {
+                    column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
                             ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
                 },
-                QueryRowInput {
-                    row: QueryRowInputRowOptions {
+                Input {
+                    row: RowOptions {
                         key: "stats#cell_cnt".into(),
                     },
-                    column: Some(QueryRowInputColumnOptions {
+                    column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
                             ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
                 },
-                QueryRowInput {
-                    row: QueryRowInputRowOptions {
+                Input {
+                    row: RowOptions {
                         key: "gc#del_cnt".into(),
                     },
-                    column: Some(QueryRowInputColumnOptions {
+                    column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
                             ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),

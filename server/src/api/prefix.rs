@@ -10,7 +10,7 @@ use actix_web::{
     HttpResponse,
 };
 use serde_json::json;
-use smoltable::{QueryPrefixInput, TableWriter};
+use smoltable::{query::prefix::Input as QueryPrefixInput, TableWriter};
 
 #[post("/v1/table/{name}/prefix")]
 pub async fn handler(

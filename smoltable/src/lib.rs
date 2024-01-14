@@ -1,6 +1,7 @@
 mod cell;
 mod column_filter;
 mod column_key;
+pub mod query;
 mod row;
 mod table;
 
@@ -13,10 +14,8 @@ pub use {
     row::Row,
     table::writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter},
     table::{
-        row_reader::{QueryRowInput, QueryRowInputColumnOptions, QueryRowInputRowOptions},
-        ColumnFamilyDefinition, CreateColumnFamilyInput, GarbageCollectionOptions, QueryOutput,
-        QueryPrefixInput, QueryPrefixInputCellOptions, QueryPrefixInputColumnOptions,
-        QueryPrefixInputRowOptions, QueryRowOutput, Smoltable, BLOCK_SIZE,
+        ColumnFamilyDefinition, CreateColumnFamilyInput, GarbageCollectionOptions, Smoltable,
+        BLOCK_SIZE,
     },
 };
 
