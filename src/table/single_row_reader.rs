@@ -13,7 +13,7 @@ pub struct QueryRowInputRowOptions {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryRowInputColumnOptions {
-    pub cell_limit: Option<u16>,
+    pub cell_limit: Option<u32>,
 
     #[serde(flatten)]
     pub filter: Option<ColumnFilter>,

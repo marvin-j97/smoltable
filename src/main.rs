@@ -353,7 +353,6 @@ async fn main() -> fjall::Result<()> {
     }
 
     {
-        let keyspace = keyspace.clone();
         let tables = tables.clone();
 
         log::info!("Starting row counting worker");
@@ -401,8 +400,6 @@ async fn main() -> fjall::Result<()> {
 
                     log::debug!("Counted {table_name}");
                 }
-
-                keyspace.persist().unwrap();
 
                 let time_s = before.elapsed().as_secs();
 
@@ -503,8 +500,6 @@ async fn main() -> fjall::Result<()> {
                     ],
                 )
                 .ok();
-
-                keyspace.persist().unwrap();
 
                 log::info!("System metrics worker done");
                 tokio::time::sleep(Duration::from_secs(60)).await;

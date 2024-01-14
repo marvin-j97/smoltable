@@ -22,7 +22,7 @@ pub struct Input {
 
 // TODO: change input format to Vec, atomic multi-row deletes...?
 
-#[delete("/v1/table/{name}/rows")]
+#[delete("/v1/table/{name}/row")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,

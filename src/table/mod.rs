@@ -144,14 +144,14 @@ pub enum ColumnFilter {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryPrefixInputRowOptions {
-    pub limit: Option<u16>,
-    pub cell_limit: Option<u16>,
+    pub limit: Option<u32>,
+    pub cell_limit: Option<u32>,
     pub sample: Option<f32>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryPrefixInputColumnOptions {
-    pub cell_limit: Option<u16>,
+    pub cell_limit: Option<u32>,
 
     #[serde(flatten)]
     pub filter: Option<ColumnFilter>,
@@ -247,8 +247,8 @@ impl Smoltable {
             name,
             keyspace,
             Arc::new(fjall::compaction::Levelled {
-                target_size: 64 * 1_024 * 1_024,
-                l0_threshold: 4,
+                target_size: 128 * 1_024 * 1_024,
+                l0_threshold: 8,
             }),
         )
     }
@@ -359,6 +359,7 @@ impl Smoltable {
         })
     } */
 
+    // TODO: unit test
     pub fn count(&self) -> fjall::Result<(usize, usize)> {
         use reader::Reader as TableReader;
 
@@ -549,19 +550,23 @@ impl Smoltable {
         use reader::Reader as TableReader;
 
         let column_filter = &input.column.as_ref().and_then(|x| x.filter.clone());
-        let row_limit = input.row.as_ref().and_then(|x| x.limit).unwrap_or(u16::MAX) as usize;
+        let row_limit = input
+            .row
+            .as_ref()
+            .and_then(|x| x.limit)
+            .unwrap_or(u32::from(u16::MAX)) as usize;
 
         let column_cell_limit = input
             .column
             .as_ref()
             .and_then(|x| x.cell_limit)
-            .unwrap_or(u16::MAX) as usize;
+            .unwrap_or(u32::from(u16::MAX)) as usize;
 
         let row_cell_limit = input
             .row
             .as_ref()
             .and_then(|x| x.cell_limit)
-            .unwrap_or(u16::MAX) as usize;
+            .unwrap_or(u32::from(u16::MAX)) as usize;
 
         let global_cell_limit = input
             .cell
@@ -698,12 +703,11 @@ impl Smoltable {
     }
 
     pub fn query_row(&self, input: QueryRowInput) -> fjall::Result<QueryRowOutput> {
-        let column_cell_limit: usize = input
+        let column_cell_limit = input
             .column
             .as_ref()
             .and_then(|x| x.cell_limit)
-            .unwrap_or(u16::MAX)
-            .into();
+            .unwrap_or(u32::from(u16::MAX));
 
         let row_key = input.row.key.clone();
         let mut columns: HashMap<String, HashMap<String, Vec<Cell>>> = HashMap::new();
@@ -720,7 +724,7 @@ impl Smoltable {
                 .entry(cell.column_key.qualifier.unwrap_or(String::from("_")))
                 .or_default();
 
-            if version_history.len() < column_cell_limit {
+            if version_history.len() < column_cell_limit as usize {
                 version_history.push(Cell {
                     timestamp: cell.timestamp,
                     value: cell.value,
