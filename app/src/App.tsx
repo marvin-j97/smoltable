@@ -233,6 +233,8 @@ function App() {
   const rowCount = () => extractTimeseries(tableStatsMap(), "stats#row_cnt");
   const cellCount = () => extractTimeseries(tableStatsMap(), "stats#cell_cnt");
   const gcDeleteCount = () => extractTimeseries(tableStatsMap(), "gc#del_cnt");
+  const writeBufferSize = () => extractTimeseries(tableStatsMap(), "wbuf#size");
+
 
   onMount(() => {
     setTimeout(() => window.location.reload(), 60 * 1000)
@@ -262,6 +264,13 @@ function App() {
               name: "Mem",
               data: mem(),
             }
+          ]}
+        />
+        <LineChart
+          title="Write buffer size"
+          yFormatter={prettyBytes}
+          series={[
+            ...writeBufferSize()
           ]}
         />
         <LineChart

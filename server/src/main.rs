@@ -436,6 +436,8 @@ async fn main() -> fjall::Result<()> {
                 }
 
                 let journal_count = keyspace.journal_count();
+                let write_buffer_size = keyspace.write_buffer_size();
+                // TODO: let block_cache_size = keyspace.block_cache_size();
 
                 TableWriter::write_batch(
                     system_metrics_table.clone(),
@@ -443,6 +445,7 @@ async fn main() -> fjall::Result<()> {
                         smoltable::row!("sys#cpu", vec![data_point!(sysinfo.load_average().one)]),
                         smoltable::row!("sys#mem", vec![data_point!(sysinfo.used_memory() as f64)]),
                         smoltable::row!("wal#len", vec![data_point!(journal_count as f64)]),
+                        smoltable::row!("wbuf#size", vec![data_point!(write_buffer_size as f64)]),
                     ],
                 )
                 .ok();
