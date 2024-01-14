@@ -142,12 +142,19 @@ impl Smoltable {
         strategy: Arc<dyn fjall::compaction::Strategy + Send + Sync>,
     ) -> fjall::Result<Smoltable> {
         let manifest = {
-            let config = fjall::PartitionCreateOptions::default().level_count(2);
+            let config = fjall::PartitionCreateOptions::default()
+                .level_count(2)
+                .level_ratio(2);
+
             let tree = keyspace.open_partition(&format!("_man_{name}"), config)?;
+
+            tree.set_max_memtable_size(/* 512 KiB */ 512 * 1_024);
+
             tree.set_compaction_strategy(Arc::new(fjall::compaction::Levelled {
-                target_size: 4 * 1_024 * 1_024,
+                target_size: /* 512 KiB */ 512 * 1_024,
                 l0_threshold: 2,
             }));
+
             tree
         };
 
@@ -155,6 +162,7 @@ impl Smoltable {
             let config = fjall::PartitionCreateOptions::default().block_size(BLOCK_SIZE);
             let tree = keyspace.open_partition(&format!("_dat_{name}"), config)?;
             tree.set_compaction_strategy(strategy);
+
             tree
         };
 
@@ -168,6 +176,8 @@ impl Smoltable {
         let table = Self(Arc::new(table));
 
         table.load_locality_groups()?;
+
+        // TODO: set block cache if defined
 
         Ok(table)
     }
@@ -199,7 +209,7 @@ impl Smoltable {
     pub fn list_column_families(&self) -> fjall::Result<Vec<ColumnFamilyDefinition>> {
         let items = self
             .manifest
-            .prefix("cf:")
+            .prefix("cf#")
             .into_iter()
             .collect::<Result<Vec<_>, fjall::LsmError>>()?;
 
@@ -217,7 +227,7 @@ impl Smoltable {
     fn load_locality_groups(&self) -> fjall::Result<()> {
         let items = self
             .manifest
-            .prefix("lg:")
+            .prefix("lg#")
             .into_iter()
             .collect::<Result<Vec<_>, fjall::LsmError>>()?;
 
@@ -225,7 +235,7 @@ impl Smoltable {
             .into_iter()
             .map(|(key, value)| {
                 let key = std::str::from_utf8(&key).expect("should be utf-8");
-                let id = key.split(':').nth(1).expect("should have ID");
+                let id = key.split('#').nth(1).expect("should have ID");
 
                 let value = std::str::from_utf8(&value).expect("should be utf-8");
 
@@ -236,10 +246,19 @@ impl Smoltable {
                 Ok(LocalityGroup {
                     id: id.into(),
                     column_families,
-                    tree: self.keyspace.open_partition(
-                        &format!("_lg_{id}"),
-                        fjall::PartitionCreateOptions::default().block_size(BLOCK_SIZE),
-                    )?,
+                    tree: {
+                        let tree = self.keyspace.open_partition(
+                            &format!("_lg_{id}"),
+                            fjall::PartitionCreateOptions::default().block_size(BLOCK_SIZE),
+                        )?;
+
+                        tree.set_compaction_strategy(Arc::new(fjall::compaction::Levelled {
+                            target_size: 128 * 1_024 * 1_024,
+                            l0_threshold: 8,
+                        }));
+
+                        tree
+                    },
                 })
             })
             .collect::<fjall::Result<Vec<_>>>()?;
@@ -249,14 +268,37 @@ impl Smoltable {
         Ok(())
     }
 
+    /// Creates a dedicated block cache for the table.
+    ///
+    /// Will be applied after restart automatically, no need to call after every start.
+    pub fn set_cache_size(&self, bytes: u64) -> fjall::Result<()> {
+        log::debug!("Setting block cache with {bytes}B table {:?}", self.name);
+
+        self.manifest.insert("cache#bytes", bytes.to_be_bytes())?;
+
+        // TODO: create block cache and apply to all partitions
+
+        self.keyspace.persist()?;
+
+        Ok(())
+    }
+
+    /// Creates column families.
+    ///
+    /// Will be persisted, no need to call after every restart.
     pub fn create_column_families(&self, input: &CreateColumnFamilyInput) -> fjall::Result<()> {
-        log::debug!("Creating column families for table");
+        log::debug!(
+            "Creating {} column families (locality: {}) for table {:?}",
+            input.column_families.len(),
+            input.locality_group.unwrap_or_default(),
+            self.name
+        );
 
         let mut batch = self.keyspace.batch();
 
         for item in &input.column_families {
             let str = serde_json::to_string(&item).expect("should serialize");
-            batch.insert(&self.manifest, format!("cf:{}", item.name), str);
+            batch.insert(&self.manifest, format!("cf#{}", item.name), str);
         }
 
         let locality_group_id = nanoid::nanoid!();
@@ -269,7 +311,7 @@ impl Smoltable {
                 .collect();
             let str = serde_json::to_string(&names).expect("should serialize");
 
-            batch.insert(&self.manifest, format!("lg:{locality_group_id}"), str);
+            batch.insert(&self.manifest, format!("lg#{locality_group_id}"), str);
         }
 
         batch.commit()?;
@@ -279,15 +321,6 @@ impl Smoltable {
 
         Ok(())
     }
-
-    /* pub fn from_tree(keyspace: Keyspace, tree: PartitionHandle) -> fjall::Result<Smoltable> {
-        Ok(Self {
-            keyspace,
-            tree,
-            manifest: keys
-            locality_groups: vec![],
-        })
-    } */
 
     // TODO: count thrashes block cache
 

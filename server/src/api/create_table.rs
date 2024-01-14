@@ -9,6 +9,8 @@ use actix_web::{
 };
 use serde_json::json;
 
+// TODO: allow setting dedicated cache size
+
 #[put("/v1/table/{name}")]
 pub async fn handler(
     path: Path<String>,

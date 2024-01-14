@@ -27,6 +27,9 @@ pub struct AppState {
 }
 
 impl AppState {
+    // TODO: allow setting dedicated block cache per table
+    // TODO: if Some(...), show cache usage in table list PER table
+
     pub async fn create_table(&self, table_name: &str) -> fjall::Result<MonitoredSmoltable> {
         let mut tables = self.tables.write().await;
 

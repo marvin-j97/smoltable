@@ -19,6 +19,8 @@ impl MetricsTable {
             )),
         )?;
 
+        table.tree.set_max_memtable_size(/* 1 MiB*/ 1_024 * 1_024);
+
         table.create_column_families(&CreateColumnFamilyInput {
             column_families: vec![ColumnFamilyDefinition {
                 name: "value".into(),

@@ -20,8 +20,8 @@ impl ManifestTable {
         tree.set_max_memtable_size(/* 512 KiB */ 512 * 1_024);
 
         tree.set_compaction_strategy(Arc::new(fjall::compaction::Levelled {
+            target_size: /* 512 KiB */ 512 * 1_024,
             l0_threshold: 2,
-            target_size: 512 * 1_024,
         }));
 
         #[cfg(debug_assertions)]

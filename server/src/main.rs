@@ -250,7 +250,7 @@ async fn main() -> fjall::Result<()> {
     let port = get_port();
 
     let block_cache = Arc::new(fjall::BlockCache::with_capacity_bytes(
-        /* 32 MiB */ 32 * 1_024 * 1_024,
+        /* 16 MiB */ 16 * 1_024 * 1_024,
     ));
 
     let keyspace = fjall::Config::new(data_folder())
