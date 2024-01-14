@@ -20,6 +20,7 @@ use std::{
 // NOTE: Bigger block size is advantageous for Smoltable, because:
 // - better compression ratio when block is larger
 // - workload is dominated by prefix & range searches
+/// The block size used by Smoltable (64 KiB)
 pub const BLOCK_SIZE: u32 = /* 64 KiB */ 64 * 1024;
 
 #[derive(Clone)]
@@ -41,8 +42,6 @@ impl LocalityGroup {
     }
 }
 
-// TODO: metrics
-
 pub struct SmoltableInner {
     /// Name
     pub name: Arc<str>,
@@ -60,6 +59,7 @@ pub struct SmoltableInner {
     pub locality_groups: RwLock<Vec<LocalityGroup>>,
 }
 
+/// A single smoltable
 #[derive(Clone)]
 pub struct Smoltable(Arc<SmoltableInner>);
 
@@ -679,7 +679,7 @@ impl Smoltable {
         })
     }
 
-    pub fn batch(&self) -> Batch {
+    fn batch(&self) -> Batch {
         self.keyspace.batch()
     }
 

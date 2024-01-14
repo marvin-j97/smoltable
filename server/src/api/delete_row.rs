@@ -1,4 +1,5 @@
 use crate::app_state::AppState;
+use crate::data_point;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_table_identifier;
 use crate::response::build_response;
@@ -10,7 +11,7 @@ use actix_web::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use smoltable::{CellValue, ColumnKey, ColumnWriteItem, RowWriteItem, TableWriter};
+use smoltable::TableWriter;
 
 #[derive(Debug, Deserialize)]
 pub struct Input {
@@ -65,22 +66,8 @@ pub async fn handler(
         TableWriter::write_batch(
             table.metrics.clone(),
             &[
-                RowWriteItem {
-                    row_key: "lat#del#row".to_string(),
-                    cells: vec![ColumnWriteItem {
-                        column_key: ColumnKey::try_from("value").expect("should be column key"),
-                        timestamp: None,
-                        value: CellValue::F64(micros_total as f64),
-                    }],
-                },
-                RowWriteItem {
-                    row_key: "lat#del#cell".to_string(),
-                    cells: vec![ColumnWriteItem {
-                        column_key: ColumnKey::try_from("value").expect("should be column key"),
-                        timestamp: None,
-                        value: CellValue::F64(micros_per_item as f64),
-                    }],
-                },
+                smoltable::row!("lat#del#row", vec![data_point!(micros_total as f64)]),
+                smoltable::row!("lat#del#cell", vec![data_point!(micros_per_item as f64)]),
             ],
         )
         .ok();

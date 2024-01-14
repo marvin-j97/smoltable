@@ -33,3 +33,10 @@ impl MetricsTable {
         Ok(table)
     }
 }
+
+#[macro_export]
+macro_rules! data_point {
+    ($value:expr) => {
+        smoltable::cell!("value", None, smoltable::CellValue::F64($value))
+    };
+}

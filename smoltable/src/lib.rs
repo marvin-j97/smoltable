@@ -19,3 +19,24 @@ pub use {
         QueryPrefixInputRowOptions, QueryRowOutput, Smoltable, BLOCK_SIZE,
     },
 };
+
+#[macro_export]
+macro_rules! row {
+    ($key:expr, $cells:expr) => {
+        $crate::RowWriteItem {
+            row_key: $key.to_string(),
+            cells: $cells,
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! cell {
+    ($key:expr, $timestamp:expr, $cell_value:expr) => {
+        $crate::ColumnWriteItem {
+            column_key: $crate::ColumnKey::try_from($key).expect("should be column key"),
+            timestamp: $timestamp,
+            value: $cell_value,
+        }
+    };
+}

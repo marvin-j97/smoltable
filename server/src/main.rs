@@ -16,8 +16,8 @@ use error::CustomRouteResult;
 use manifest::ManifestTable;
 use metrics::MetricsTable;
 use smoltable::{
-    ColumnFamilyDefinition, ColumnWriteItem, CreateColumnFamilyInput, GarbageCollectionOptions,
-    RowWriteItem, Smoltable, TableWriter,
+    ColumnFamilyDefinition, ColumnFilter, ColumnKey, CreateColumnFamilyInput,
+    GarbageCollectionOptions, Smoltable, TableWriter,
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use sysinfo::SystemExt;
@@ -69,8 +69,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 key: "sys#cpu".into(),
             },
             column: Some(QueryRowInputColumnOptions {
-                filter: Some(smoltable::ColumnFilter::Key(
-                    smoltable::ColumnKey::try_from("value:").expect("should be valid column key"),
+                filter: Some(ColumnFilter::Key(
+                    ColumnKey::try_from("value:").expect("should be valid column key"),
                 )),
                 cell_limit: Some(1_440 / 2),
             }),
@@ -80,8 +80,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 key: "sys#mem".into(),
             },
             column: Some(QueryRowInputColumnOptions {
-                filter: Some(smoltable::ColumnFilter::Key(
-                    smoltable::ColumnKey::try_from("value:").expect("should be valid column key"),
+                filter: Some(ColumnFilter::Key(
+                    ColumnKey::try_from("value:").expect("should be valid column key"),
                 )),
                 cell_limit: Some(1_440 / 2),
             }),
@@ -91,8 +91,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 key: "wal#len".into(),
             },
             column: Some(QueryRowInputColumnOptions {
-                filter: Some(smoltable::ColumnFilter::Key(
-                    smoltable::ColumnKey::try_from("value:").expect("should be valid column key"),
+                filter: Some(ColumnFilter::Key(
+                    ColumnKey::try_from("value:").expect("should be valid column key"),
                 )),
                 cell_limit: Some(1_440 / 2),
             }),
@@ -115,9 +115,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                         key: "lat#write#batch".into(),
                     },
                     column: Some(QueryRowInputColumnOptions {
-                        filter: Some(smoltable::ColumnFilter::Key(
-                            smoltable::ColumnKey::try_from("value:")
-                                .expect("should be valid column key"),
+                        filter: Some(ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
@@ -127,9 +126,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                         key: "lat#read#pfx".into(),
                     },
                     column: Some(QueryRowInputColumnOptions {
-                        filter: Some(smoltable::ColumnFilter::Key(
-                            smoltable::ColumnKey::try_from("value:")
-                                .expect("should be valid column key"),
+                        filter: Some(ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
@@ -139,9 +137,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                         key: "lat#read#row".into(),
                     },
                     column: Some(QueryRowInputColumnOptions {
-                        filter: Some(smoltable::ColumnFilter::Key(
-                            smoltable::ColumnKey::try_from("value:")
-                                .expect("should be valid column key"),
+                        filter: Some(ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
@@ -151,9 +148,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                         key: "lat#del#row".into(),
                     },
                     column: Some(QueryRowInputColumnOptions {
-                        filter: Some(smoltable::ColumnFilter::Key(
-                            smoltable::ColumnKey::try_from("value:")
-                                .expect("should be valid column key"),
+                        filter: Some(ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
@@ -163,9 +159,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                         key: "stats#du".into(),
                     },
                     column: Some(QueryRowInputColumnOptions {
-                        filter: Some(smoltable::ColumnFilter::Key(
-                            smoltable::ColumnKey::try_from("value:")
-                                .expect("should be valid column key"),
+                        filter: Some(ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
@@ -175,9 +170,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                         key: "stats#seg_cnt".into(),
                     },
                     column: Some(QueryRowInputColumnOptions {
-                        filter: Some(smoltable::ColumnFilter::Key(
-                            smoltable::ColumnKey::try_from("value:")
-                                .expect("should be valid column key"),
+                        filter: Some(ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
@@ -187,9 +181,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                         key: "stats#row_cnt".into(),
                     },
                     column: Some(QueryRowInputColumnOptions {
-                        filter: Some(smoltable::ColumnFilter::Key(
-                            smoltable::ColumnKey::try_from("value:")
-                                .expect("should be valid column key"),
+                        filter: Some(ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
@@ -199,9 +192,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                         key: "stats#cell_cnt".into(),
                     },
                     column: Some(QueryRowInputColumnOptions {
-                        filter: Some(smoltable::ColumnFilter::Key(
-                            smoltable::ColumnKey::try_from("value:")
-                                .expect("should be valid column key"),
+                        filter: Some(ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
@@ -211,9 +203,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                         key: "gc#del_cnt".into(),
                     },
                     column: Some(QueryRowInputColumnOptions {
-                        filter: Some(smoltable::ColumnFilter::Key(
-                            smoltable::ColumnKey::try_from("value:")
-                                .expect("should be valid column key"),
+                        filter: Some(ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
                         )),
                         cell_limit: Some(1_440 / 2),
                     }),
@@ -335,15 +326,10 @@ async fn main() -> fjall::Result<()> {
 
                             TableWriter::write_batch(
                                 table.metrics.clone(),
-                                &[RowWriteItem {
-                                    row_key: "gc#del_cnt".to_string(),
-                                    cells: vec![ColumnWriteItem {
-                                        column_key: smoltable::ColumnKey::try_from("value")
-                                            .expect("should be column key"),
-                                        timestamp: None,
-                                        value: smoltable::CellValue::F64(deleted_count as f64),
-                                    }],
-                                }],
+                                &[smoltable::row!(
+                                    "gc#del_cnt",
+                                    vec![data_point!(deleted_count as f64)]
+                                )],
                             )
                             .ok();
                         }
@@ -382,24 +368,14 @@ async fn main() -> fjall::Result<()> {
                         TableWriter::write_batch(
                             table.metrics.clone(),
                             &[
-                                RowWriteItem {
-                                    row_key: "stats#row_cnt".to_string(),
-                                    cells: vec![ColumnWriteItem {
-                                        column_key: smoltable::ColumnKey::try_from("value")
-                                            .expect("should be column key"),
-                                        timestamp: None,
-                                        value: smoltable::CellValue::F64(row_count as f64),
-                                    }],
-                                },
-                                RowWriteItem {
-                                    row_key: "stats#cell_cnt".to_string(),
-                                    cells: vec![ColumnWriteItem {
-                                        column_key: smoltable::ColumnKey::try_from("value")
-                                            .expect("should be column key"),
-                                        timestamp: None,
-                                        value: smoltable::CellValue::F64(cell_count as f64),
-                                    }],
-                                },
+                                smoltable::row!(
+                                    "stats#row_cnt",
+                                    vec![data_point!(row_count as f64)]
+                                ),
+                                smoltable::row!(
+                                    "stats#cell_cnt",
+                                    vec![data_point!(cell_count as f64)]
+                                ),
                             ],
                         )
                         .ok();
@@ -449,24 +425,11 @@ async fn main() -> fjall::Result<()> {
                     TableWriter::write_batch(
                         table.metrics.clone(),
                         &[
-                            RowWriteItem {
-                                row_key: "stats#seg_cnt".to_string(),
-                                cells: vec![ColumnWriteItem {
-                                    column_key: smoltable::ColumnKey::try_from("value")
-                                        .expect("should be column key"),
-                                    timestamp: None,
-                                    value: smoltable::CellValue::F64(segment_count as f64),
-                                }],
-                            },
-                            RowWriteItem {
-                                row_key: "stats#du".to_string(),
-                                cells: vec![ColumnWriteItem {
-                                    column_key: smoltable::ColumnKey::try_from("value")
-                                        .expect("should be column key"),
-                                    timestamp: None,
-                                    value: smoltable::CellValue::F64(folder_size as f64),
-                                }],
-                            },
+                            smoltable::row!(
+                                "stats#seg_cnt",
+                                vec![data_point!(segment_count as f64)]
+                            ),
+                            smoltable::row!("stats#du", vec![data_point!(folder_size as f64)]),
                         ],
                     )
                     .ok();
@@ -477,33 +440,9 @@ async fn main() -> fjall::Result<()> {
                 TableWriter::write_batch(
                     system_metrics_table.clone(),
                     &[
-                        RowWriteItem {
-                            row_key: "sys#cpu".to_string(),
-                            cells: vec![ColumnWriteItem {
-                                column_key: smoltable::ColumnKey::try_from("value")
-                                    .expect("should be column key"),
-                                timestamp: None,
-                                value: smoltable::CellValue::F64(sysinfo.load_average().one),
-                            }],
-                        },
-                        RowWriteItem {
-                            row_key: "sys#mem".to_string(),
-                            cells: vec![ColumnWriteItem {
-                                column_key: smoltable::ColumnKey::try_from("value")
-                                    .expect("should be column key"),
-                                timestamp: None,
-                                value: smoltable::CellValue::F64(sysinfo.used_memory() as f64),
-                            }],
-                        },
-                        RowWriteItem {
-                            row_key: "wal#len".to_string(),
-                            cells: vec![ColumnWriteItem {
-                                column_key: smoltable::ColumnKey::try_from("value")
-                                    .expect("should be column key"),
-                                timestamp: None,
-                                value: smoltable::CellValue::Byte(journal_count as u8),
-                            }],
-                        },
+                        smoltable::row!("sys#cpu", vec![data_point!(sysinfo.load_average().one)]),
+                        smoltable::row!("sys#mem", vec![data_point!(sysinfo.used_memory() as f64)]),
+                        smoltable::row!("wal#len", vec![data_point!(journal_count as f64)]),
                     ],
                 )
                 .ok();

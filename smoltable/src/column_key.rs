@@ -10,6 +10,12 @@ pub fn is_valid_identifier(s: &str) -> bool {
     !s.is_empty() && s.len() < 512 && all_allowed
 }
 
+/// The column key allows accessing a column
+///
+/// It is defined as "family:qualifier", where qualifier may be empty
+/// (the colon may omitted in that case).
+///
+/// A column family may house arbitrarily many columns.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ColumnKey {
     pub family: String,

@@ -2,23 +2,53 @@ use crate::{column_key::ColumnKey, ColumnFilter};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// Cell value
+///
+/// In Bigtable, a cell value is just an unstructured byte array.
+///
+/// Smoltable supports various data types for better DX.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Value {
+    /// UTF-8 encoded string
     String(String),
+
+    /// like Byte, but is unmarshalled as boolean
     Boolean(bool),
+
+    /// unsigned integer, 1 byte
     Byte(u8),
+
+    /// signed integer, 4 bytes
     I32(i32),
+
+    /// signed integer, 8 bytes
     I64(i64),
+
+    /// floating point, 4 bytes
     F32(f32),
+
+    /// floating point, 8 bytes
     F64(f64),
 }
 
+/// A cell and its meta information
 #[derive(Clone, Debug)]
 pub struct VisitedCell {
+    /// The raw cell key, which is `row_key:cf:cq:!ts`
     pub raw_key: Arc<[u8]>,
+
+    /// User row key
     pub row_key: String,
+
+    /// Column key
     pub column_key: ColumnKey,
+
+    /// Timestamp
+    ///
+    /// Will be restored in negated form to order by descending
     pub timestamp: u128,
+
+    /// Cell value
     pub value: Value,
 }
 
@@ -118,8 +148,7 @@ impl VisitedCell {
     }
 }
 
-// TODO: move to server?
-/// User-facing cell
+/// User-facing cell content
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Cell {
     pub timestamp: u128,

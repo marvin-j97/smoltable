@@ -1,4 +1,5 @@
 use crate::app_state::AppState;
+use crate::data_point;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_table_identifier;
 use crate::response::build_response;
@@ -9,9 +10,7 @@ use actix_web::{
     HttpResponse,
 };
 use serde_json::json;
-use smoltable::{
-    CellValue, ColumnKey, ColumnWriteItem, QueryPrefixInput, RowWriteItem, TableWriter,
-};
+use smoltable::{QueryPrefixInput, TableWriter};
 
 #[post("/v1/table/{name}/prefix")]
 pub async fn handler(
@@ -58,14 +57,10 @@ pub async fn handler(
 
         TableWriter::write_batch(
             table.metrics.clone(),
-            &[RowWriteItem {
-                row_key: "lat#read#pfx".to_string(),
-                cells: vec![ColumnWriteItem {
-                    column_key: ColumnKey::try_from("value").expect("should be column key"),
-                    timestamp: None,
-                    value: CellValue::F64(micros_total as f64),
-                }],
-            }],
+            &[smoltable::row!(
+                "lat#read#pfx",
+                vec![data_point!(micros_total as f64)]
+            )],
         )
         .ok();
 

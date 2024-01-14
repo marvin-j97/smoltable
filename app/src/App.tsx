@@ -219,9 +219,9 @@ function App() {
     y: bytes,
   }));
 
-  const journalCount = () => (sysRows().find(x => x.row_key === "wal#len")?.columns.value[""] ?? []).map(({ timestamp, value: { Byte: y } }) => ({
+  const journalCount = () => (sysRows().find(x => x.row_key === "wal#len")?.columns.value[""] ?? []).map(({ timestamp, value: { F64, Byte } }) => ({
     x: new Date(timestamp / 1000 / 1000),
-    y,
+    y: Byte ?? F64, // NOTE: Byte has changed to F64
   }));
 
   const writeLatency = () => extractTimeseries(tableStatsMap(), "lat#write#batch");
