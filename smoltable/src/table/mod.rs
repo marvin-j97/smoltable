@@ -149,7 +149,7 @@ impl Smoltable {
             name,
             keyspace,
             Arc::new(fjall::compaction::Levelled {
-                target_size: 128 * 1_024 * 1_024,
+                target_size: 64 * 1_024 * 1_024,
                 l0_threshold: 8,
             }),
         )
@@ -215,7 +215,7 @@ impl Smoltable {
                         )?;
 
                         tree.set_compaction_strategy(Arc::new(fjall::compaction::Levelled {
-                            target_size: 128 * 1_024 * 1_024,
+                            target_size: 64 * 1_024 * 1_024,
                             l0_threshold: 8,
                         }));
 
