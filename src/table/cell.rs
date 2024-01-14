@@ -46,7 +46,7 @@ impl Cell {
 
         // NOTE: + 1 because of : delimiter
         let key_without_ts = &key[0..(key.len() - std::mem::size_of::<u128>() - 1)];
-        let mut parsed_key = key_without_ts.rsplitn(4, |&e| e == b':');
+        let mut parsed_key = key_without_ts.rsplitn(3, |&e| e == b':');
 
         let last = parsed_key.next().unwrap();
         let cq = std::str::from_utf8(last).ok().map(Into::into);
