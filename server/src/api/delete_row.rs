@@ -1,10 +1,7 @@
 use crate::app_state::AppState;
-use crate::column_key::ColumnKey;
 use crate::error::CustomRouteResult;
-use crate::identifier::is_valid_identifier;
+use crate::identifier::is_valid_table_identifier;
 use crate::response::build_response;
-use crate::table::cell::Value as CellValue;
-use crate::table::writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter};
 use actix_web::http::StatusCode;
 use actix_web::{
     delete,
@@ -13,6 +10,7 @@ use actix_web::{
 };
 use serde::Deserialize;
 use serde_json::json;
+use smoltable::{CellValue, ColumnKey, ColumnWriteItem, RowWriteItem, TableWriter};
 
 #[derive(Debug, Deserialize)]
 pub struct Input {
@@ -43,7 +41,7 @@ pub async fn handler(
         ));
     }
 
-    if !is_valid_identifier(&table_name) {
+    if !is_valid_table_identifier(&table_name) {
         return Ok(build_response(
             before.elapsed(),
             StatusCode::BAD_REQUEST,

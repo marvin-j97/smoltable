@@ -1,13 +1,22 @@
-use crate::identifier::is_valid_identifier;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+// Define the allowed characters
+const ALLOWED_CHARS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.#$";
+
+pub fn is_valid_identifier(s: &str) -> bool {
+    // Check if all characters in the string are allowed
+    let all_allowed = s.chars().all(|c| ALLOWED_CHARS.contains(c));
+
+    !s.is_empty() && s.len() < 512 && all_allowed
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ParsedColumnKey {
+pub struct ColumnKey {
     pub family: String,
     pub qualifier: Option<String>,
 }
 
-impl ParsedColumnKey {
+impl ColumnKey {
     pub fn build_key(&self, row_key: &str) -> String {
         match &self.qualifier {
             Some(cq) => format!("{row_key}:{}:{}:", self.family, cq),
@@ -16,7 +25,7 @@ impl ParsedColumnKey {
     }
 }
 
-impl std::fmt::Display for ParsedColumnKey {
+impl std::fmt::Display for ColumnKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -27,7 +36,7 @@ impl std::fmt::Display for ParsedColumnKey {
     }
 }
 
-impl TryFrom<&str> for ParsedColumnKey {
+impl TryFrom<&str> for ColumnKey {
     type Error = ();
 
     fn try_from(value: &str) -> Result<Self, ()> {
@@ -56,7 +65,7 @@ impl TryFrom<&str> for ParsedColumnKey {
     }
 }
 
-impl Serialize for ParsedColumnKey {
+impl Serialize for ColumnKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -66,19 +75,19 @@ impl Serialize for ParsedColumnKey {
     }
 }
 
-impl<'de> Deserialize<'de> for ParsedColumnKey {
+impl<'de> Deserialize<'de> for ColumnKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        // Define a visitor for the ParsedColumnKey struct
-        struct ParsedColumnKeyVisitor;
+        // Define a visitor for the ColumnKey struct
+        struct ColumnKeyVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for ParsedColumnKeyVisitor {
-            type Value = ParsedColumnKey;
+        impl<'de> serde::de::Visitor<'de> for ColumnKeyVisitor {
+            type Value = ColumnKey;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a string representing ParsedColumnKey")
+                formatter.write_str("a string representing ColumnKey")
             }
 
             // Deserialize the struct from a string
@@ -86,14 +95,12 @@ impl<'de> Deserialize<'de> for ParsedColumnKey {
             where
                 E: serde::de::Error,
             {
-                ParsedColumnKey::try_from(value).map_err(|_| {
+                ColumnKey::try_from(value).map_err(|_| {
                     serde::de::Error::invalid_value(serde::de::Unexpected::Str(value), &self)
                 })
             }
         }
 
-        deserializer.deserialize_str(ParsedColumnKeyVisitor)
+        deserializer.deserialize_str(ColumnKeyVisitor)
     }
 }
-
-pub type ColumnKey = ParsedColumnKey;

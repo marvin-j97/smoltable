@@ -1,5 +1,5 @@
-use super::{CellValue, Smoltable};
-use crate::column_key::ColumnKey;
+use super::Smoltable;
+use crate::{CellValue, ColumnKey};
 use fjall::Batch;
 use serde::Deserialize;
 

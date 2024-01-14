@@ -1,20 +1,19 @@
-use super::{
-    cell::VisitedCell, reader::Reader as TableReader, satisfies_column_filter, ColumnFilter,
-    Smoltable,
-};
+use super::reader::Reader as TableReader;
+use crate::{ColumnFilter, Smoltable, VisitedCell};
 use fjall::PartitionHandle;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryRowInputRowOptions {
     pub key: String,
-    // TODO: cell_limit
+    // TODO: row-wide cell_limit
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryRowInputColumnOptions {
     pub cell_limit: Option<u32>,
 
+    // TODO: column limit
     #[serde(flatten)]
     pub filter: Option<ColumnFilter>,
 }
@@ -130,11 +129,6 @@ impl SingleRowReader {
             _ => format!("{}:", self.input.row.key),
         };
 
-        log::debug!(
-            "Performing cell scan over {:?} with prefix {prefix:?}",
-            locality_group.name
-        );
-
         self.inner = Some(TableReader::new(self.instant, locality_group, prefix));
     }
 }
@@ -162,7 +156,7 @@ impl Iterator for &mut SingleRowReader {
                     let column_filter = self.input.column.as_ref().and_then(|x| x.filter.as_ref());
 
                     if let Some(filter) = column_filter {
-                        if !satisfies_column_filter(&cell, filter) {
+                        if !cell.satisfies_column_filter(filter) {
                             continue;
                         }
                     }

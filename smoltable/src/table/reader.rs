@@ -1,5 +1,4 @@
-use super::cell::VisitedCell;
-use crate::table::cell::Cell;
+use crate::VisitedCell;
 use fjall::{PartitionHandle, Snapshot};
 use std::{collections::VecDeque, ops::Bound};
 
@@ -16,6 +15,12 @@ pub struct Reader {
     pub bytes_scanned_count: u64,
 
     chunk_size: usize,
+}
+
+impl std::fmt::Display for Reader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TableReader({:?})", self.prefix)
+    }
 }
 
 impl Reader {
@@ -58,7 +63,7 @@ impl Reader {
         Some(Ok(()))
     }
 
-    // TODO: try to make Peek return a &VisitedCell
+    // TODO: try to make Peek return a &smoltable::VisitedCell
     pub fn peek(&mut self) -> Option<fjall::Result<VisitedCell>> {
         use std::ops::Bound::{Excluded, Unbounded};
 
@@ -106,7 +111,7 @@ impl Reader {
                     self.buffer.extend(
                         chunk
                             .into_iter()
-                            .map(|(k, v)| Cell::parse(k, &v))
+                            .map(|(k, v)| VisitedCell::parse(k, &v))
                             .collect::<Vec<_>>(),
                     );
 
@@ -129,64 +134,5 @@ impl Iterator for &mut Reader {
             Err(e) => Some(Err(e)),
             Ok(_) => Some(Ok(self.buffer.pop_front().unwrap())),
         }
-
-        /*   use std::ops::Bound::{Excluded, Unbounded};
-
-        // First, consume buffer, if filled
-        if let Some(cell) = self.buffer.pop_front() {
-            return Some(Ok(cell));
-        }
-
-        // Get initial range start
-        if self.range.is_none() {
-            if let Err(e) = self.initialize_range()? {
-                return Some(Err(e));
-            }
-        }
-
-        let mut range = self.range.clone().unwrap();
-
-        loop {
-            // Advance range by querying chunks
-            match self
-                .snapshot
-                .range(range.clone())
-                .into_iter()
-                .take(self.chunk_size)
-                .filter(|x| match x {
-                    Ok((key, _)) => key.starts_with(self.prefix.as_bytes()),
-                    Err(_) => true,
-                })
-                .collect::<Result<Vec<_>, fjall::LsmError>>()
-            {
-                Ok(chunk) => {
-                    if chunk.is_empty() {
-                        return None;
-                    }
-
-                    self.cells_scanned_count += chunk.len() as u64;
-                    self.bytes_scanned_count += chunk
-                        .iter()
-                        .map(|(k, v)| k.len() as u64 + v.len() as u64)
-                        .sum::<u64>();
-
-                    let (last_key, _) = chunk.last().unwrap();
-                    range = (Excluded(last_key.to_vec()), Unbounded);
-
-                    self.buffer.extend(
-                        chunk
-                            .into_iter()
-                            .map(|(k, v)| Cell::parse(k, &v))
-                            .collect::<Vec<_>>(),
-                    );
-
-                    if let Some(cell) = self.buffer.pop_front() {
-                        self.range = Some(range);
-                        return Some(Ok(cell));
-                    }
-                }
-                Err(e) => return Some(Err(fjall::Error::Storage(e))),
-            }
-        } */
     }
 }

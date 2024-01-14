@@ -1,8 +1,8 @@
-use crate::{
-    env::metrics_cap_mb,
-    table::{ColumnFamilyDefinition, CreateColumnFamilyInput, GarbageCollectionOptions, Smoltable},
-};
+use crate::env::metrics_cap_mb;
 use fjall::Keyspace;
+use smoltable::{
+    ColumnFamilyDefinition, CreateColumnFamilyInput, GarbageCollectionOptions, Smoltable,
+};
 use std::sync::Arc;
 
 pub struct MetricsTable;

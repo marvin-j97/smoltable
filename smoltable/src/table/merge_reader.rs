@@ -1,4 +1,5 @@
-use super::{cell::VisitedCell, reader::Reader as TableReader};
+use super::reader::Reader as TableReader;
+use crate::VisitedCell;
 
 pub struct MergeReader {
     readers: Vec<TableReader>,

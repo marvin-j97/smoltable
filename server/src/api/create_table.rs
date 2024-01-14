@@ -1,5 +1,5 @@
 use crate::error::CustomRouteResult;
-use crate::identifier::is_valid_identifier;
+use crate::identifier::is_valid_table_identifier;
 use crate::{app_state::AppState, response::build_response};
 use actix_web::{
     http::StatusCode,
@@ -27,7 +27,7 @@ pub async fn handler(
         ));
     }
 
-    if !is_valid_identifier(&table_name) {
+    if !is_valid_table_identifier(&table_name) {
         return Ok(build_response(
             before.elapsed(),
             StatusCode::BAD_REQUEST,

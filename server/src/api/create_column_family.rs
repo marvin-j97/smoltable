@@ -1,8 +1,7 @@
 use crate::app_state::AppState;
 use crate::error::CustomRouteResult;
-use crate::identifier::is_valid_identifier;
+use crate::identifier::is_valid_table_identifier;
 use crate::response::build_response;
-use crate::table::CreateColumnFamilyInput;
 use actix_web::http::StatusCode;
 use actix_web::{
     post,
@@ -10,6 +9,7 @@ use actix_web::{
     HttpResponse,
 };
 use serde_json::json;
+use smoltable::CreateColumnFamilyInput;
 
 #[post("/v1/table/{name}/column-family")]
 pub async fn handler(
@@ -30,7 +30,7 @@ pub async fn handler(
         ));
     }
 
-    if !is_valid_identifier(&table_name) {
+    if !is_valid_table_identifier(&table_name) {
         return Ok(build_response(
             before.elapsed(),
             StatusCode::BAD_REQUEST,

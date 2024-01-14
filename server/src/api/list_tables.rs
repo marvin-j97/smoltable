@@ -1,11 +1,11 @@
 use crate::app_state::AppState;
 use crate::error::CustomRouteResult;
 use crate::response::build_response;
-use crate::table::{ColumnFamilyDefinition, BLOCK_SIZE};
 use actix_web::http::StatusCode;
 use actix_web::{get, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use smoltable::{ColumnFamilyDefinition, BLOCK_SIZE};
 use std::path::PathBuf;
 use std::sync::Arc;
 

@@ -1,19 +1,14 @@
-pub mod cell;
 pub mod merge_reader;
 pub mod reader;
-pub mod single_row_reader;
+pub mod row_reader;
 pub mod writer;
 
-use self::{
-    cell::{Cell, Row, Value as CellValue, VisitedCell},
-    single_row_reader::{QueryRowInput, QueryRowInputRowOptions, SingleRowReader},
-};
+use self::row_reader::{QueryRowInput, QueryRowInputRowOptions, SingleRowReader};
 use crate::{
-    column_key::{ColumnKey, ParsedColumnKey},
     table::{
-        merge_reader::MergeReader, single_row_reader::get_affected_locality_groups,
-        writer::timestamp_nano,
+        merge_reader::MergeReader, row_reader::get_affected_locality_groups, writer::timestamp_nano,
     },
+    Cell, ColumnFilter, ColumnKey, Row,
 };
 use fjall::{Batch, Keyspace, PartitionHandle};
 use serde::{Deserialize, Serialize};
@@ -26,60 +21,6 @@ use std::{
 // - better compression ratio when block is larger
 // - workload is dominated by prefix & range searches
 pub const BLOCK_SIZE: u32 = /* 64 KiB */ 64 * 1024;
-
-fn satisfies_column_filter(cell: &VisitedCell, filter: &ColumnFilter) -> bool {
-    match filter {
-        ColumnFilter::Key(key) => {
-            if cell.column_key.family != key.family {
-                return false;
-            }
-
-            if let Some(cq_filter) = &key.qualifier {
-                if cell.column_key.qualifier.as_deref().unwrap_or("") != cq_filter {
-                    return false;
-                }
-            }
-
-            true
-        }
-        ColumnFilter::Multi(keys) => {
-            for key in keys {
-                if cell.column_key.family != key.family {
-                    continue;
-                }
-
-                if let Some(cq_filter) = &key.qualifier {
-                    if cell.column_key.qualifier.as_deref().unwrap_or("") == cq_filter {
-                        return true;
-                    }
-                } else {
-                    return true;
-                }
-            }
-
-            false
-        }
-        ColumnFilter::Prefix(key) => {
-            if cell.column_key.family != key.family {
-                return false;
-            }
-
-            if let Some(cq_filter) = &key.qualifier {
-                if !cell
-                    .column_key
-                    .qualifier
-                    .as_deref()
-                    .unwrap_or("")
-                    .starts_with(cq_filter)
-                {
-                    return false;
-                }
-            }
-
-            true
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct LocalityGroup {
@@ -131,18 +72,6 @@ impl std::ops::Deref for Smoltable {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum ColumnFilter {
-    #[serde(rename = "key")]
-    Key(ColumnKey),
-
-    #[serde(rename = "multi_key")]
-    Multi(Vec<ColumnKey>),
-
-    #[serde(rename = "prefix")]
-    Prefix(ColumnKey),
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QueryPrefixInputRowOptions {
     pub limit: Option<u32>,
     pub cell_limit: Option<u32>,
@@ -153,6 +82,7 @@ pub struct QueryPrefixInputRowOptions {
 pub struct QueryPrefixInputColumnOptions {
     pub cell_limit: Option<u32>,
 
+    // TODO: column limit
     #[serde(flatten)]
     pub filter: Option<ColumnFilter>,
 }
@@ -374,7 +304,7 @@ impl Smoltable {
 
         let readers = locality_groups_to_scan
             .into_iter()
-            .map(|x| TableReader::new(instant, x, "".into()))
+            .map(|x| TableReader::new(instant, x, "".into()).chunk_size(100_000))
             .collect::<Vec<_>>();
 
         let mut current_row_key = None;
@@ -428,7 +358,7 @@ impl Smoltable {
                 gc_options_map
                     .keys()
                     .map(|cf| {
-                        ParsedColumnKey::try_from(cf.as_str())
+                        ColumnKey::try_from(cf.as_str())
                             .expect("should be valid column family name")
                     })
                     .collect(),
@@ -588,7 +518,7 @@ impl Smoltable {
 
         let readers = locality_groups_to_scan
             .into_iter()
-            .map(|x| TableReader::new(instant, x, input.prefix.clone()))
+            .map(|x| TableReader::new(instant, x, input.prefix.clone()).chunk_size(16_000))
             .collect::<Vec<_>>();
 
         let mut reader = MergeReader::new(readers);
@@ -607,7 +537,7 @@ impl Smoltable {
             let cell = cell?;
 
             if let Some(filter) = column_filter {
-                if !satisfies_column_filter(&cell, filter) {
+                if !cell.satisfies_column_filter(filter) {
                     continue;
                 }
             }
@@ -792,12 +722,10 @@ impl Smoltable {
 
 #[cfg(test)]
 mod tests {
-    use super::single_row_reader::{
-        QueryRowInput, QueryRowInputColumnOptions, QueryRowInputRowOptions,
-    };
+    use super::row_reader::{QueryRowInput, QueryRowInputColumnOptions, QueryRowInputRowOptions};
     use super::writer::Writer as TableWriter;
     use super::*;
-    use crate::column_key::ColumnKey;
+    use crate::CellValue;
     use test_log::test;
 
     #[test]
@@ -1522,7 +1450,7 @@ mod tests {
         let folder = tempfile::tempdir()?;
 
         let keyspace = fjall::Config::new(folder.path()).open()?;
-        let table = Smoltable::open("test", keyspace.clone())?;
+        let table = open("test", keyspace.clone())?;
 
         assert_eq!(0, table.list_column_families()?.len());
 
@@ -1642,7 +1570,7 @@ mod tests {
         let folder = tempfile::tempdir()?;
 
         let keyspace = fjall::Config::new(folder.path()).open()?;
-        let table = Smoltable::open("test", keyspace.clone())?;
+        let table = open("test", keyspace.clone())?;
 
         assert_eq!(0, table.list_column_families()?.len());
 
@@ -1729,7 +1657,7 @@ mod tests {
         let folder = tempfile::tempdir()?;
 
         let keyspace = fjall::Config::new(folder.path()).open()?;
-        let table = Smoltable::open("test", keyspace.clone())?;
+        let table = open("test", keyspace.clone())?;
 
         assert_eq!(0, table.list_column_families()?.len());
 
@@ -1941,7 +1869,7 @@ mod tests {
         let folder = tempfile::tempdir()?;
 
         let keyspace = fjall::Config::new(folder.path()).open()?;
-        let table = Smoltable::open("test", keyspace.clone())?;
+        let table = open("test", keyspace.clone())?;
 
         assert_eq!(0, table.list_column_families()?.len());
 
@@ -2122,7 +2050,7 @@ mod tests {
         let folder = tempfile::tempdir()?;
 
         let keyspace = fjall::Config::new(folder.path()).open()?;
-        let table = Smoltable::open("test", keyspace.clone())?;
+        let table = open("test", keyspace.clone())?;
 
         assert_eq!(0, table.list_column_families()?.len());
 

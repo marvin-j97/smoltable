@@ -26,7 +26,7 @@ RUN cargo build --release
 FROM alpine as runner
 WORKDIR /app
 
-COPY --from=rust-builder /app/target/release/smoltable /app/smoltable
+COPY --from=rust-builder /app/target/release/server /app/smoltable
 COPY --from=node-builder /app/dist /app/dist
 
 ENTRYPOINT ["/app/smoltable"]

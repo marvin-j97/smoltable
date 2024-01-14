@@ -1,5 +1,6 @@
-use crate::{manifest::ManifestTable, metrics::MetricsTable, table::Smoltable};
+use crate::{manifest::ManifestTable, metrics::MetricsTable};
 use fjall::{BlockCache, Keyspace};
+use smoltable::Smoltable;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 
