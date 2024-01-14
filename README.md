@@ -1,13 +1,13 @@
-[![CI](https://github.com/marvin-j97/smoltable/actions/workflows/test.yml/badge.svg)](https://github.com/marvin-j97/smoltable/actions/workflows/test.yml)
-
 <p align="center">
-  <img src="/logo.png" height="96">
+  <img src="/logo.png" height="96" />
 </p>
-<p align="center>
+<p align="center">
   Bigtable but smol.
 </p>
 
 ## About
+
+[![CI](https://github.com/marvin-j97/smoltable/actions/workflows/test.yml/badge.svg)](https://github.com/marvin-j97/smoltable/actions/workflows/test.yml)
 
 Smoltable is a tiny wide-column store heavily inspired by [Google Bigtable](https://static.googleusercontent.com/media/research.google.com/de//archive/bigtable-osdi06.pdf). It is implemented in Rust and is based on a [custom-written LSM storage engine](https://github.com/marvin-j97/fjall), also written in Rust. It can be accessed through a JSON REST API, with potential plans for future embeddability.
 
