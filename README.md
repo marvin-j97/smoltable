@@ -1,6 +1,11 @@
 [![CI](https://github.com/marvin-j97/smoltable/actions/workflows/test.yml/badge.svg)](https://github.com/marvin-j97/smoltable/actions/workflows/test.yml)
 
-Bigtable but smol.
+<p align="center">
+  <img src="/logo.png" height="96">
+</p>
+<p align="center>
+  Bigtable but smol.
+</p>
 
 ## About
 
