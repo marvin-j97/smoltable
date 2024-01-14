@@ -230,6 +230,7 @@ function App() {
   }));
 
   const writeLatency = () => extractTimeseries(tableStatsMap(), "lat#write#batch");
+  const cellWriteLatency = () => extractTimeseries(tableStatsMap(), "lat#write#cell");
   const rowReadLatency = () => extractTimeseries(tableStatsMap(), "lat#read#row");
   const prefixLatency = () => extractTimeseries(tableStatsMap(), "lat#read#pfx");
   const rowDeleteLatency = () => extractTimeseries(tableStatsMap(), "lat#del#row");
@@ -355,6 +356,22 @@ function App() {
           }}
           series={[
             ...writeLatency(),
+          ]}
+        />
+        <LineChart
+          alwaysShowLegend
+          title="Cell write latency"
+          yFormatter={x => {
+            if (x < 1_000) {
+              return `${x} µs`
+            }
+            if (x < 1_000_000) {
+              return `${(x / 1000).toFixed(2)} ms`
+            }
+            return `${(x / 1000 / 1000).toFixed(2)} s`
+          }}
+          series={[
+            ...cellWriteLatency(),
           ]}
         />
         <LineChart

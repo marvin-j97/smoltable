@@ -139,7 +139,7 @@ impl Smoltable {
 
         table.load_locality_groups()?;
 
-        // TODO: set block cache if defined
+        // TODO: set block cache(s) if defined
 
         Ok(table)
     }
@@ -238,7 +238,7 @@ impl Smoltable {
 
         self.manifest.insert("cache#bytes", bytes.to_be_bytes())?;
 
-        // TODO: create block cache and apply to all partitions
+        // TODO: create block cache and apply to locality group...or all partitions...
 
         self.keyspace.persist()?;
 

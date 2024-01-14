@@ -20,4 +20,6 @@ jobs:
       - name: Build and push Docker image
         run: |
           docker build . -f Dockerfile.alpine -t ghcr.io/${{ github.repository }}:alpine-edge
+          docker build . -f Dockerfile.debian -t ghcr.io/${{ github.repository }}:debian-edge
           docker push ghcr.io/${{ github.repository }}:alpine-edge
+          docker push ghcr.io/${{ github.repository }}:debian-edge

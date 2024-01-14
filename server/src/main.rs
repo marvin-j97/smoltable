@@ -123,6 +123,17 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
             let result = table.metrics.multi_get(vec![
                 Input {
                     row: RowOptions {
+                        key: "lat#write#cell".into(),
+                    },
+                    column: Some(ColumnOptions {
+                        filter: Some(ColumnFilter::Key(
+                            ColumnKey::try_from("value:").expect("should be valid column key"),
+                        )),
+                        cell_limit: Some(1_440 / 2),
+                    }),
+                },
+                Input {
+                    row: RowOptions {
                         key: "lat#write#batch".into(),
                     },
                     column: Some(ColumnOptions {
@@ -260,8 +271,11 @@ async fn main() -> fjall::Result<()> {
     log::info!("{} {}", env!("CARGO_CRATE_NAME"), env!("CARGO_PKG_VERSION"));
     let port = get_port();
 
+    // NOTE: Block cache should be pretty small, because it will be mostly used for
+    // metrics & manifest, because if the user really wants more cache, it should be
+    // defined on a per-table/locality-group basis
     let block_cache = Arc::new(fjall::BlockCache::with_capacity_bytes(
-        /* 16 MiB */ 16 * 1_024 * 1_024,
+        /* 8 MiB */ 8 * 1_024 * 1_024,
     ));
 
     let keyspace = fjall::Config::new(data_folder())
@@ -397,7 +411,7 @@ async fn main() -> fjall::Result<()> {
 
                 let time_s = before.elapsed().as_secs();
 
-                log::info!("Counting worker done");
+                log::info!("Counting worker done in {time_s}s");
 
                 let sleep_time = match time_s {
                     _ if time_s < 5 => 60,
