@@ -219,6 +219,11 @@ function App() {
     y: bytes,
   }));
 
+  const writeBufferSize = () => (sysRows().find(x => x.row_key === "wbuf#size")?.columns.value[""] ?? []).map(({ timestamp, value: { F64: bytes } }) => ({
+    x: new Date(timestamp / 1000 / 1000),
+    y: bytes,
+  }));
+
   const journalCount = () => (sysRows().find(x => x.row_key === "wal#len")?.columns.value[""] ?? []).map(({ timestamp, value: { F64, Byte } }) => ({
     x: new Date(timestamp / 1000 / 1000),
     y: Byte ?? F64, // NOTE: Byte has changed to F64
@@ -233,8 +238,6 @@ function App() {
   const rowCount = () => extractTimeseries(tableStatsMap(), "stats#row_cnt");
   const cellCount = () => extractTimeseries(tableStatsMap(), "stats#cell_cnt");
   const gcDeleteCount = () => extractTimeseries(tableStatsMap(), "gc#del_cnt");
-  const writeBufferSize = () => extractTimeseries(tableStatsMap(), "wbuf#size");
-
 
   onMount(() => {
     setTimeout(() => window.location.reload(), 60 * 1000)
