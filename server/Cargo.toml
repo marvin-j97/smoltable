@@ -19,7 +19,7 @@ serde = { version = "1.0.195", features = ["derive"] }
 serde_json = "1.0.111"
 
 # NOTE: Don't need bloom filters, because we always do prefix queries for pretty much everything
-fjall = { version = "0.3.1", default-features = false, features = [] }
+fjall = { version = "0.3.2", default-features = false, features = [] }
 smoltable = { path = "../smoltable" }
 
 fs_extra = "1.3.0"
