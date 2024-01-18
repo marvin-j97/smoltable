@@ -13,12 +13,14 @@ Smoltable is a tiny wide-column store heavily inspired by [Google Bigtable](http
 
 ## Data model
 
-Its data model is essentially the same as Bigtable’s, where each row:
+Its data model is essentially the same as Bigtable’s, where:
 
-- is identified by its row and
-- can have arbitrarily many columns
+- each row is identified by its row key
+- the table's order is determined by the row key
+- a row can have arbitrarily many columns
+- columns are grouped into column families
 
-Columns are grouped into column families. The table is sparse, so unused columns do not count into space usage. For each row’s column there may be multiple values sorted by time. Optionally, old versions can then be lazily & automatically deleted.
+The table is sparse, so unused columns do not count into space usage. Each cell value may have multiple values sorted by time. Optionally, old versions can then be lazily & automatically deleted.
 
 In Bigtable, stored values are byte blobs; Smoltable supports multiple data types out of the box:
 
@@ -30,7 +32,7 @@ In Bigtable, stored values are byte blobs; Smoltable supports multiple data type
 - F32 (floating point, 4 bytes)
 - F64 (floating point, 8 bytes)
 
-Column families can be grouped into locality groups, which partition columns into separate files, increasing scan performance over those column families (e.g. OLAP-style queries over a specific column).
+Column families can be grouped into locality groups, which partition groups of column families into separate LSM-trees, increasing scan performance over those column families (e.g. OLAP-style queries over a specific column).
 
 ## Compatibility
 
