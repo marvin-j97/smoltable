@@ -16,6 +16,7 @@ impl MetricsTable {
             keyspace,
             Arc::new(fjall::compaction::Fifo::new(
                 /* N MiB */ max_mb * 1_000 * 1_000,
+                None,
             )),
         )?;
 
