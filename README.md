@@ -16,7 +16,7 @@ Smoltable is a tiny wide-column store heavily inspired by [Google Bigtable](http
 Its data model is essentially the same as Bigtable’s, where:
 
 - each row is identified by its row key
-- the table's order is determined by the row key
+- the table's ordering is determined by the row key
 - a row can have arbitrarily many columns
 - columns are grouped into column families
 
