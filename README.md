@@ -18,9 +18,9 @@ Its data model is essentially the same as Bigtable’s, where:
 - each row is identified by its row key
 - the table's ordering is determined by the row key
 - a row can have arbitrarily many columns
-- columns are grouped into column families
+- columns are grouped into column families - each family is sorted by the column's name (column qualifier)
 
-The table is sparse, so unused columns do not count into space usage. Each cell value may have multiple values sorted by time. Optionally, old versions can then be lazily & automatically deleted.
+Each row can have a different set of columns (schema-less). The table is sparse, so unused columns do not count into space usage. Each cell value may have multiple values sorted by time. Optionally, old versions can then be lazily & automatically deleted.
 
 In Bigtable, stored values are byte blobs; Smoltable supports multiple data types out of the box:
 
