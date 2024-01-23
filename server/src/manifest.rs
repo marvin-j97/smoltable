@@ -7,7 +7,7 @@ pub struct ManifestTable {
 }
 
 impl ManifestTable {
-    pub fn open(keyspace: Keyspace) -> fjall::Result<Self> {
+    pub fn open(keyspace: Keyspace) -> smoltable::Result<Self> {
         log::debug!("Loading manifest table");
 
         let tree = keyspace.open_partition(
@@ -24,7 +24,7 @@ impl ManifestTable {
             l0_threshold: 2,
         }));
 
-        #[cfg(debug_assertions)]
+        /* #[cfg(debug_assertions)]
         {
             eprintln!("= MANIFEST =");
             for item in &tree.iter() {
@@ -35,19 +35,20 @@ impl ManifestTable {
                 eprintln!("{key} => {value}");
             }
             eprintln!("= MANIFEST OVER =");
-        }
+        } */
 
         log::info!("Recovered manifest table");
 
         Ok(Self { tree, keyspace })
     }
 
-    pub fn get_user_table_names(&self) -> fjall::Result<Vec<String>> {
+    pub fn get_user_table_names(&self) -> smoltable::Result<Vec<String>> {
         let items = self
             .tree
             .iter()
             .into_iter()
-            .collect::<Result<Vec<_>, fjall::LsmError>>()?;
+            .collect::<Result<Vec<_>, fjall::LsmError>>()
+            .map_err(fjall::Error::from)?;
 
         let names = items
             .into_iter()
@@ -60,7 +61,7 @@ impl ManifestTable {
         Ok(names)
     }
 
-    pub fn persist_user_table(&self, table_name: &str) -> fjall::Result<()> {
+    pub fn persist_user_table(&self, table_name: &str) -> smoltable::Result<()> {
         self.tree
             .insert(format!("table#{table_name}#name"), table_name)?;
 
@@ -69,7 +70,7 @@ impl ManifestTable {
         Ok(())
     }
 
-    pub fn delete_user_table(&self, table_name: &str) -> fjall::Result<()> {
+    pub fn delete_user_table(&self, table_name: &str) -> smoltable::Result<()> {
         self.tree.remove(format!("table#{table_name}#name"))?;
         Ok(())
     }

@@ -9,7 +9,7 @@ use smoltable::{
 use test_log::test;
 
 #[test]
-pub fn read_row_simple_column_filter() -> fjall::Result<()> {
+pub fn read_row_simple_column_filter() -> smoltable::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;

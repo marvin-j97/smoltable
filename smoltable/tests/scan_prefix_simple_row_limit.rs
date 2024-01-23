@@ -6,7 +6,7 @@ use smoltable::{
 use test_log::test;
 
 #[test]
-pub fn scan_prefix_simple_row_limit() -> fjall::Result<()> {
+pub fn scan_prefix_simple_row_limit() -> smoltable::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;

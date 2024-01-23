@@ -25,7 +25,7 @@ use tokio::sync::RwLock;
 
 async fn recover_tables(
     manifest_table: &ManifestTable,
-) -> fjall::Result<HashMap<String, MonitoredSmoltable>> {
+) -> smoltable::Result<HashMap<String, MonitoredSmoltable>> {
     log::info!("Recovering user tables");
 
     let mut tables = HashMap::default();
@@ -249,7 +249,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
 
             Ok((table_name.clone(), result.rows))
         })
-        .collect::<fjall::Result<HashMap<_, _>>>()?;
+        .collect::<smoltable::Result<HashMap<_, _>>>()?;
 
     let html = if cfg!(debug_assertions) {
         // NOTE: Enable hot reload in debug mode
@@ -281,7 +281,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
 // TODO: use spawn blocking
 
 #[actix_web::main]
-async fn main() -> fjall::Result<()> {
+async fn main() -> smoltable::Result<()> {
     env_logger::Builder::from_default_env().init();
 
     log::info!("{} {}", env!("CARGO_CRATE_NAME"), env!("CARGO_PKG_VERSION"));

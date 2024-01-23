@@ -5,7 +5,7 @@ use smoltable::{
 use test_log::test;
 
 #[test]
-pub fn write_count() -> fjall::Result<()> {
+pub fn write_count() -> smoltable::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;

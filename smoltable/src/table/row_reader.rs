@@ -6,7 +6,7 @@ use fjall::PartitionHandle;
 pub fn get_affected_locality_groups(
     table: &Smoltable,
     column_filter: &Option<ColumnFilter>,
-) -> fjall::Result<Vec<PartitionHandle>> {
+) -> crate::Result<Vec<PartitionHandle>> {
     let mut locality_groups = vec![];
 
     if let Some(cf) = column_filter {
@@ -79,7 +79,7 @@ pub struct SingleRowReader {
 }
 
 impl SingleRowReader {
-    pub fn new(table: &Smoltable, instant: fjall::Instant, input: Input) -> fjall::Result<Self> {
+    pub fn new(table: &Smoltable, instant: fjall::Instant, input: Input) -> crate::Result<Self> {
         let column_filter = input.column.as_ref().and_then(|x| x.filter.clone());
         let locality_groups = get_affected_locality_groups(table, &column_filter)?;
 

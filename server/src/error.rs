@@ -1,7 +1,7 @@
 use actix_web::{HttpResponse, ResponseError};
 
 #[derive(Debug)]
-pub struct CustomHttpError(fjall::Error);
+pub struct CustomHttpError(smoltable::Error);
 
 impl std::fmt::Display for CustomHttpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -15,15 +15,15 @@ impl ResponseError for CustomHttpError {
     }
 }
 
-impl From<fjall::Error> for CustomHttpError {
-    fn from(value: fjall::Error) -> Self {
+impl From<smoltable::Error> for CustomHttpError {
+    fn from(value: smoltable::Error) -> Self {
         Self(value)
     }
 }
 
 impl From<std::io::Error> for CustomHttpError {
     fn from(value: std::io::Error) -> Self {
-        Self(fjall::Error::from(value))
+        Self(smoltable::Error::from(value))
     }
 }
 

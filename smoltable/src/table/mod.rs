@@ -102,7 +102,7 @@ impl Smoltable {
         name: &str,
         keyspace: Keyspace,
         strategy: Arc<dyn fjall::compaction::Strategy + Send + Sync>,
-    ) -> fjall::Result<Smoltable> {
+    ) -> crate::Result<Smoltable> {
         let manifest = {
             let config = fjall::PartitionCreateOptions::default()
                 .level_count(2)
@@ -144,7 +144,7 @@ impl Smoltable {
         Ok(table)
     }
 
-    pub fn open(name: &str, keyspace: Keyspace) -> fjall::Result<Smoltable> {
+    pub fn open(name: &str, keyspace: Keyspace) -> crate::Result<Smoltable> {
         Self::with_strategy(
             name,
             keyspace,
@@ -158,7 +158,7 @@ impl Smoltable {
     pub(crate) fn get_partition_for_column_family(
         &self,
         cf_name: &str,
-    ) -> fjall::Result<PartitionHandle> {
+    ) -> crate::Result<PartitionHandle> {
         let locality_groups = self.locality_groups.read().expect("lock is poisoned");
 
         Ok(locality_groups
@@ -168,12 +168,13 @@ impl Smoltable {
             .unwrap_or_else(|| self.tree.clone()))
     }
 
-    pub fn list_column_families(&self) -> fjall::Result<Vec<ColumnFamilyDefinition>> {
+    pub fn list_column_families(&self) -> crate::Result<Vec<ColumnFamilyDefinition>> {
         let items = self
             .manifest
             .prefix("cf#")
             .into_iter()
-            .collect::<Result<Vec<_>, fjall::LsmError>>()?;
+            .collect::<Result<Vec<_>, fjall::LsmError>>()
+            .map_err(fjall::Error::from)?;
 
         let items = items
             .into_iter()
@@ -186,12 +187,13 @@ impl Smoltable {
         Ok(items)
     }
 
-    fn load_locality_groups(&self) -> fjall::Result<()> {
+    fn load_locality_groups(&self) -> crate::Result<()> {
         let items = self
             .manifest
             .prefix("lg#")
             .into_iter()
-            .collect::<Result<Vec<_>, fjall::LsmError>>()?;
+            .collect::<Result<Vec<_>, fjall::LsmError>>()
+            .map_err(fjall::Error::from)?;
 
         let items = items
             .into_iter()
@@ -223,7 +225,7 @@ impl Smoltable {
                     },
                 })
             })
-            .collect::<fjall::Result<Vec<_>>>()?;
+            .collect::<crate::Result<Vec<_>>>()?;
 
         *self.locality_groups.write().expect("lock is poisoned") = items;
 
@@ -233,7 +235,7 @@ impl Smoltable {
     /// Creates a dedicated block cache for the table.
     ///
     /// Will be applied after restart automatically, no need to call after every start.
-    pub fn set_cache_size(&self, bytes: u64) -> fjall::Result<()> {
+    pub fn set_cache_size(&self, bytes: u64) -> crate::Result<()> {
         log::debug!("Setting block cache with {bytes}B table {:?}", self.name);
 
         self.manifest.insert("cache#bytes", bytes.to_be_bytes())?;
@@ -248,7 +250,7 @@ impl Smoltable {
     /// Creates column families.
     ///
     /// Will be persisted, no need to call after every restart.
-    pub fn create_column_families(&self, input: &CreateColumnFamilyInput) -> fjall::Result<()> {
+    pub fn create_column_families(&self, input: &CreateColumnFamilyInput) -> crate::Result<()> {
         log::debug!(
             "Creating {} column families (locality: {}) for table {:?}",
             input.column_families.len(),
@@ -287,7 +289,7 @@ impl Smoltable {
     // TODO: count thrashes block cache
 
     // TODO: unit test
-    pub fn count(&self) -> fjall::Result<(usize, usize)> {
+    pub fn count(&self) -> crate::Result<(usize, usize)> {
         use reader::Reader as TableReader;
 
         let mut cell_count = 0;
@@ -328,7 +330,7 @@ impl Smoltable {
     // TODO: GC thrashes block cache
 
     // TODO: unit test
-    pub fn run_version_gc(&self) -> fjall::Result<u64> {
+    pub fn run_version_gc(&self) -> crate::Result<u64> {
         use reader::Reader as TableReader;
 
         let gc_options_map = self
@@ -431,7 +433,7 @@ impl Smoltable {
     // TODO: delete row thrashes block cache
 
     // TODO: allow deleting specific columns -> DeleteRowInput, also batch + limit it?
-    pub fn delete_row(&self, row_key: String) -> fjall::Result<u64> {
+    pub fn delete_row(&self, row_key: String) -> crate::Result<u64> {
         let mut count = 0;
 
         let mut reader = SingleRowReader::new(
@@ -457,7 +459,7 @@ impl Smoltable {
         Ok(count)
     }
 
-    pub fn multi_get(&self, inputs: Vec<QueryRowInput>) -> fjall::Result<QueryPrefixOutput> {
+    pub fn multi_get(&self, inputs: Vec<QueryRowInput>) -> crate::Result<QueryPrefixOutput> {
         let mut cells_scanned_count = 0;
         let mut rows_scanned_count = 0;
         let mut bytes_scanned_count = 0;
@@ -482,7 +484,7 @@ impl Smoltable {
 
     // TODO: use in get_row and query_prefix/scan: RowGatherer that gets some Readers and... gathers them
 
-    pub fn scan(&self, input: QueryPrefixInput) -> fjall::Result<QueryPrefixOutput> {
+    pub fn scan(&self, input: QueryPrefixInput) -> crate::Result<QueryPrefixOutput> {
         use reader::Reader as TableReader;
 
         let column_filter = &input.column.as_ref().and_then(|x| x.filter.clone());
@@ -545,7 +547,8 @@ impl Smoltable {
             let cell = cell?;
 
             // TODO: test with multiple partitions, can only break once ALL partitions have emitted row key that doesn't match scan mode
-            // TODO: Reader.finish() -> is_finished = true, short circuits next() to None?
+            // TODO: Reader.stop() -> is_finished = true, short circuits next() to None?
+            // TODO: merge reader needs "stop predicate" or something...
             match &input.row.scan {
                 ScanMode::Prefix(prefix) => {
                     if !cell.row_key.starts_with(prefix) {
@@ -553,8 +556,6 @@ impl Smoltable {
                     }
                 }
                 ScanMode::Range(range) => {
-                    // TODO: unit test
-
                     if range.inclusive {
                         if cell.row_key > range.end {
                             break;
@@ -640,7 +641,7 @@ impl Smoltable {
         })
     }
 
-    fn column_families_that_are_in_default_locality_group(&self) -> fjall::Result<Vec<String>> {
+    fn column_families_that_are_in_default_locality_group(&self) -> crate::Result<Vec<String>> {
         let mut fams = self
             .list_column_families()?
             .into_iter()
@@ -661,7 +662,7 @@ impl Smoltable {
         Ok(fams)
     }
 
-    pub fn get_row(&self, input: QueryRowInput) -> fjall::Result<QueryRowOutput> {
+    pub fn get_row(&self, input: QueryRowInput) -> crate::Result<QueryRowOutput> {
         let global_cell_limit = input.row.cell_limit.unwrap_or(u32::from(u16::MAX));
 
         let column_cell_limit = input

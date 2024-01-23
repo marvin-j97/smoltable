@@ -6,7 +6,7 @@ use smoltable::{
 use test_log::test;
 
 #[test]
-pub fn write_read_row_cell_limit() -> fjall::Result<()> {
+pub fn write_read_row_cell_limit() -> smoltable::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;

@@ -30,7 +30,7 @@ impl AppState {
     // TODO: allow setting dedicated block cache per table
     // TODO: if Some(...), show cache usage in table list PER table
 
-    pub async fn create_table(&self, table_name: &str) -> fjall::Result<MonitoredSmoltable> {
+    pub async fn create_table(&self, table_name: &str) -> smoltable::Result<MonitoredSmoltable> {
         let mut tables = self.tables.write().await;
 
         self.manifest_table.persist_user_table(table_name)?;

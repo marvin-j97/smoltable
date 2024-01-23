@@ -6,7 +6,7 @@ use smoltable::{
 use test_log::test;
 
 #[test]
-pub fn read_row_multiple_families() -> fjall::Result<()> {
+pub fn read_row_multiple_families() -> smoltable::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;

@@ -6,7 +6,7 @@ use smoltable::{
 use test_log::test;
 
 #[test]
-pub fn read_row_simple() -> fjall::Result<()> {
+pub fn read_row_simple() -> smoltable::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;
@@ -73,7 +73,7 @@ pub fn read_row_simple() -> fjall::Result<()> {
 }
 
 #[test]
-pub fn read_row_simple_multiple_columns() -> fjall::Result<()> {
+pub fn read_row_simple_multiple_columns() -> smoltable::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;

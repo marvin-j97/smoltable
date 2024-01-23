@@ -9,7 +9,7 @@ use smoltable::{
 use test_log::test;
 
 #[test]
-pub fn read_row_multi_column_filter_multiple_locality_groups() -> fjall::Result<()> {
+pub fn read_row_multi_column_filter_multiple_locality_groups() -> smoltable::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;

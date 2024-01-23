@@ -8,7 +8,7 @@ use std::sync::Arc;
 pub struct MetricsTable;
 
 impl MetricsTable {
-    pub async fn open(keyspace: Keyspace, name: &str) -> fjall::Result<Smoltable> {
+    pub async fn open(keyspace: Keyspace, name: &str) -> smoltable::Result<Smoltable> {
         let max_mb = u64::from(metrics_cap_mb());
 
         let table = Smoltable::with_strategy(

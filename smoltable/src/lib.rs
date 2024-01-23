@@ -1,6 +1,7 @@
 mod cell;
 mod column_filter;
 mod column_key;
+mod error;
 pub mod query;
 mod row;
 mod table;
@@ -11,6 +12,7 @@ pub use {
     cell::VisitedCell,
     column_filter::ColumnFilter,
     column_key::ColumnKey,
+    error::{Error, Result},
     row::Row,
     table::writer::{ColumnWriteItem, RowWriteItem, Writer as TableWriter},
     table::{

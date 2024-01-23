@@ -38,7 +38,7 @@ impl Writer {
         }
     }
 
-    pub fn write_batch(table: Smoltable, items: &[RowWriteItem]) -> fjall::Result<()> {
+    pub fn write_batch(table: Smoltable, items: &[RowWriteItem]) -> crate::Result<()> {
         let mut writer = Self::new(table);
         for item in items {
             writer.write(item)?;
@@ -47,7 +47,7 @@ impl Writer {
         Ok(())
     }
 
-    pub fn write(&mut self, item: &RowWriteItem) -> fjall::Result<()> {
+    pub fn write(&mut self, item: &RowWriteItem) -> crate::Result<()> {
         for cell in &item.cells {
             let key = VisitedCell::format_key(
                 &item.row_key,
@@ -67,7 +67,8 @@ impl Writer {
         Ok(())
     }
 
-    pub fn finalize(self) -> fjall::Result<()> {
-        self.batch.commit()
+    pub fn finalize(self) -> crate::Result<()> {
+        self.batch.commit()?;
+        Ok(())
     }
 }

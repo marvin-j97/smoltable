@@ -6,7 +6,7 @@ use smoltable::{
 use test_log::test;
 
 #[test]
-pub fn scan_all() -> fjall::Result<()> {
+pub fn scan_all() -> smoltable::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;

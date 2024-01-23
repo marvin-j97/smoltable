@@ -87,7 +87,7 @@ pub async fn handler(app_state: web::Data<AppState>) -> CustomRouteResult<HttpRe
                 },
             })
         })
-        .collect::<fjall::Result<Vec<_>>>()?;
+        .collect::<smoltable::Result<Vec<_>>>()?;
 
     let cached_block_count = app_state.block_cache.len();
 

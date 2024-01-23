@@ -9,7 +9,7 @@ use smoltable::{
 use test_log::test;
 
 #[test]
-pub fn read_row_column_cell_limit() -> fjall::Result<()> {
+pub fn read_row_column_cell_limit() -> smoltable::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;
@@ -83,7 +83,7 @@ pub fn read_row_column_cell_limit() -> fjall::Result<()> {
 }
 
 #[test]
-pub fn write_read_row_multiple_columns_cell_limit() -> fjall::Result<()> {
+pub fn write_read_row_multiple_columns_cell_limit() -> smoltable::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;
