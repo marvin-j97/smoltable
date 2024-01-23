@@ -520,8 +520,9 @@ impl Smoltable {
                 ScanMode::Prefix(prefix) => {
                     TableReader::from_prefix(instant, locality_group, prefix)
                 }
-                ScanMode::Range(range) => unimplemented!(),
-                ScanMode::Ranges(ranges) => unimplemented!(),
+                ScanMode::Range(range) => {
+                    TableReader::from_prefix(instant, locality_group, &range.start)
+                } // TODO: ScanMode::Ranges(ranges) => unimplemented!(),
             })
             .collect::<fjall::Result<Vec<_>>>()?
             .into_iter()
@@ -543,7 +544,7 @@ impl Smoltable {
 
             let cell = cell?;
 
-            // TODO: test with multiple partitions, can only break once ALL partitions have emitted row key that doesn't start with prefix
+            // TODO: test with multiple partitions, can only break once ALL partitions have emitted row key that doesn't match scan mode
             // TODO: Reader.finish() -> is_finished = true, short circuits next() to None?
             match &input.row.scan {
                 ScanMode::Prefix(prefix) => {
@@ -551,7 +552,17 @@ impl Smoltable {
                         break;
                     }
                 }
-                _ => {}
+                ScanMode::Range(range) => {
+                    // TODO: unit test
+
+                    if range.inclusive {
+                        if cell.row_key > range.end {
+                            break;
+                        }
+                    } else if cell.row_key >= range.end {
+                        break;
+                    }
+                }
             }
 
             if let Some(filter) = column_filter {

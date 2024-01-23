@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Range {
-    start: String,
-    end: String,
+    pub start: String,
+    pub end: String,
+    pub inclusive: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -14,9 +15,9 @@ pub enum ScanMode {
 
     #[serde(rename = "range")]
     Range(Range),
-
-    #[serde(rename = "ranges")]
-    Ranges(Vec<Range>),
+    // TODO:
+    /*  #[serde(rename = "ranges")]
+    Ranges(Vec<Range>), */
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
