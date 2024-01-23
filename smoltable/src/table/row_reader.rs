@@ -74,8 +74,8 @@ pub struct SingleRowReader {
     input: Input,
     instant: fjall::Instant,
     locality_groups: Vec<PartitionHandle>,
-    pub cells_scanned_count: u64,
-    pub bytes_scanned_count: u64,
+    cells_scanned_count: u64,
+    bytes_scanned_count: u64,
 }
 
 impl SingleRowReader {
@@ -93,7 +93,25 @@ impl SingleRowReader {
         })
     }
 
-    fn take_next_locality_group(&mut self) {
+    pub fn cells_scanned_count(&self) -> u64 {
+        self.cells_scanned_count
+            + self
+                .inner
+                .as_ref()
+                .map(|x| x.cells_scanned_count)
+                .unwrap_or_default()
+    }
+
+    pub fn bytes_scanned_count(&self) -> u64 {
+        self.bytes_scanned_count
+            + self
+                .inner
+                .as_ref()
+                .map(|x| x.bytes_scanned_count)
+                .unwrap_or_default()
+    }
+
+    fn take_next_locality_group(&mut self) -> fjall::Result<bool> {
         let column_filter = self.input.column.as_ref().and_then(|x| x.filter.as_ref());
 
         let locality_group = self.locality_groups.remove(0);
@@ -104,7 +122,12 @@ impl SingleRowReader {
             _ => format!("{}:", self.input.row.key),
         };
 
-        self.inner = Some(TableReader::new(self.instant, locality_group, prefix));
+        let Some(reader) = TableReader::from_prefix(self.instant, locality_group, &prefix)? else {
+            return Ok(false);
+        };
+        self.inner = Some(reader);
+
+        Ok(true)
     }
 }
 
@@ -114,7 +137,14 @@ impl Iterator for &mut SingleRowReader {
     fn next(&mut self) -> Option<Self::Item> {
         if self.inner.is_none() {
             // Initialize reader
-            self.take_next_locality_group();
+            match self.take_next_locality_group() {
+                Ok(has_range) => {
+                    if !has_range {
+                        return None;
+                    }
+                }
+                Err(e) => return Some(Err(e)),
+            };
         }
 
         loop {
@@ -141,11 +171,19 @@ impl Iterator for &mut SingleRowReader {
                 None => {
                     self.bytes_scanned_count += reader.bytes_scanned_count;
                     self.cells_scanned_count += reader.cells_scanned_count;
+                    self.inner = None;
 
                     // Iterator is empty
                     if !self.locality_groups.is_empty() {
                         // Load next one
-                        self.take_next_locality_group();
+                        match self.take_next_locality_group() {
+                            Ok(has_range) => {
+                                if !has_range {
+                                    return None;
+                                }
+                            }
+                            Err(e) => return Some(Err(e)),
+                        };
                     } else {
                         // It's over
                         return None;

@@ -67,6 +67,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
         Input {
             row: RowOptions {
                 key: "sys#cpu".into(),
+                cell_limit: None,
             },
             column: Some(ColumnOptions {
                 filter: Some(ColumnFilter::Key(
@@ -78,6 +79,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
         Input {
             row: RowOptions {
                 key: "sys#mem".into(),
+                cell_limit: None,
             },
             column: Some(ColumnOptions {
                 filter: Some(ColumnFilter::Key(
@@ -89,6 +91,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
         Input {
             row: RowOptions {
                 key: "wal#len".into(),
+                cell_limit: None,
             },
             column: Some(ColumnOptions {
                 filter: Some(ColumnFilter::Key(
@@ -100,6 +103,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
         Input {
             row: RowOptions {
                 key: "wbuf#size".into(),
+                cell_limit: None,
             },
             column: Some(ColumnOptions {
                 filter: Some(ColumnFilter::Key(
@@ -124,6 +128,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 Input {
                     row: RowOptions {
                         key: "lat#write#cell".into(),
+                        cell_limit: None,
                     },
                     column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
@@ -135,6 +140,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 Input {
                     row: RowOptions {
                         key: "lat#write#batch".into(),
+                        cell_limit: None,
                     },
                     column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
@@ -146,6 +152,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 Input {
                     row: RowOptions {
                         key: "lat#read#pfx".into(),
+                        cell_limit: None,
                     },
                     column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
@@ -157,6 +164,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 Input {
                     row: RowOptions {
                         key: "lat#read#row".into(),
+                        cell_limit: None,
                     },
                     column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
@@ -168,6 +176,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 Input {
                     row: RowOptions {
                         key: "lat#del#row".into(),
+                        cell_limit: None,
                     },
                     column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
@@ -179,6 +188,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 Input {
                     row: RowOptions {
                         key: "stats#du".into(),
+                        cell_limit: None,
                     },
                     column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
@@ -190,6 +200,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 Input {
                     row: RowOptions {
                         key: "stats#seg_cnt".into(),
+                        cell_limit: None,
                     },
                     column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
@@ -201,6 +212,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 Input {
                     row: RowOptions {
                         key: "stats#row_cnt".into(),
+                        cell_limit: None,
                     },
                     column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
@@ -212,6 +224,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 Input {
                     row: RowOptions {
                         key: "stats#cell_cnt".into(),
+                        cell_limit: None,
                     },
                     column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
@@ -223,6 +236,7 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
                 Input {
                     row: RowOptions {
                         key: "gc#del_cnt".into(),
+                        cell_limit: None,
                     },
                     column: Some(ColumnOptions {
                         filter: Some(ColumnFilter::Key(
@@ -263,6 +277,8 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
         .content_type(ContentType::html())
         .body(html))
 }
+
+// TODO: use spawn blocking
 
 #[actix_web::main]
 async fn main() -> fjall::Result<()> {
@@ -512,7 +528,7 @@ async fn main() -> fjall::Result<()> {
             .service(api::write::handler)
             .service(api::get_rows::handler)
             .service(api::delete_row::handler)
-            .service(api::prefix::handler)
+            .service(api::scan::handler)
             .service(api::create_column_family::handler)
             .service(api::metrics::handler)
             .service(api::delete_table::handler)

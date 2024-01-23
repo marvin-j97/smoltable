@@ -2,7 +2,28 @@ use crate::{ColumnFilter, Row};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Range {
+    start: String,
+    end: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum ScanMode {
+    #[serde(rename = "prefix")]
+    Prefix(String),
+
+    #[serde(rename = "range")]
+    Range(Range),
+
+    #[serde(rename = "ranges")]
+    Ranges(Vec<Range>),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RowOptions {
+    #[serde(flatten)]
+    pub scan: ScanMode,
+
     pub limit: Option<u32>,
     pub cell_limit: Option<u32>,
     pub sample: Option<f32>,
@@ -12,6 +33,8 @@ pub struct RowOptions {
 pub struct ColumnOptions {
     pub cell_limit: Option<u32>,
 
+    // pub start, end: Option<Range>, // TODO: .......
+
     // TODO: column limit
     #[serde(flatten)]
     pub filter: Option<ColumnFilter>,
@@ -20,13 +43,13 @@ pub struct ColumnOptions {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CellOptions {
     pub limit: Option<u32>,
+    // pub time: Option<Range>, // TODO:
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Input {
-    pub prefix: String, // TODO: should be row.prefix
     pub column: Option<ColumnOptions>,
-    pub row: Option<RowOptions>,
+    pub row: RowOptions,
     pub cell: Option<CellOptions>,
 }
 

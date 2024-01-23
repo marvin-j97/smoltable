@@ -55,6 +55,8 @@ pub async fn handler(
     }
 
     if let Some(table) = tables.get(&table_name).cloned() {
+        // TODO: use spawn_blocking
+
         let mut writer = TableWriter::new(table.deref().clone());
 
         drop(tables);
@@ -122,7 +124,7 @@ pub async fn handler(
     } else {
         Ok(build_response(
             before.elapsed(),
-            StatusCode::CONFLICT,
+            StatusCode::NOT_FOUND,
             "Table not found",
             &json!(null),
         ))

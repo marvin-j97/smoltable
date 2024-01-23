@@ -6,10 +6,10 @@ pub mod writer;
 use self::row_reader::SingleRowReader;
 use crate::{
     query::{
-        prefix::{Input as QueryPrefixInput, Output as QueryPrefixOutput},
         row::{
             Input as QueryRowInput, Output as QueryRowOutput, RowOptions as QueryRowInputRowOptions,
         },
+        scan::{Input as QueryPrefixInput, Output as QueryPrefixOutput, ScanMode},
     },
     table::{
         merge_reader::MergeReader, row_reader::get_affected_locality_groups, writer::timestamp_nano,
@@ -301,7 +301,7 @@ impl Smoltable {
 
         let readers = locality_groups_to_scan
             .into_iter()
-            .map(|x| TableReader::new(instant, x, "".into()).chunk_size(100_000))
+            .map(|x| TableReader::new(instant, x, std::ops::Bound::Unbounded).chunk_size(100_000))
             .collect::<Vec<_>>();
 
         let mut current_row_key = None;
@@ -367,7 +367,7 @@ impl Smoltable {
 
         let mut readers = locality_groups_to_scan
             .into_iter()
-            .map(|x| TableReader::new(instant, x, "".into()))
+            .map(|x| TableReader::new(instant, x, std::ops::Bound::Unbounded))
             .collect::<Vec<_>>();
 
         let mut current_row_key = None;
@@ -438,7 +438,10 @@ impl Smoltable {
             self,
             self.keyspace.instant(),
             QueryRowInput {
-                row: QueryRowInputRowOptions { key: row_key },
+                row: QueryRowInputRowOptions {
+                    key: row_key,
+                    cell_limit: None,
+                },
                 column: None,
             },
         )?;
@@ -462,7 +465,7 @@ impl Smoltable {
         let mut rows = Vec::with_capacity(inputs.len());
 
         for input in inputs {
-            let query_result = self.query_row(input)?;
+            let query_result = self.get_row(input)?;
             rows.extend(query_result.row);
             cells_scanned_count += query_result.cells_scanned_count;
             bytes_scanned_count += query_result.bytes_scanned_count;
@@ -477,15 +480,13 @@ impl Smoltable {
         })
     }
 
-    pub fn query_prefix(&self, input: QueryPrefixInput) -> fjall::Result<QueryPrefixOutput> {
+    // TODO: use in get_row and query_prefix/scan: RowGatherer that gets some Readers and... gathers them
+
+    pub fn scan(&self, input: QueryPrefixInput) -> fjall::Result<QueryPrefixOutput> {
         use reader::Reader as TableReader;
 
         let column_filter = &input.column.as_ref().and_then(|x| x.filter.clone());
-        let row_limit = input
-            .row
-            .as_ref()
-            .and_then(|x| x.limit)
-            .unwrap_or(u32::from(u16::MAX)) as usize;
+        let row_limit = input.row.limit.unwrap_or(u32::from(u16::MAX)) as usize;
 
         let column_cell_limit = input
             .column
@@ -493,11 +494,7 @@ impl Smoltable {
             .and_then(|x| x.cell_limit)
             .unwrap_or(u32::from(u16::MAX)) as usize;
 
-        let row_cell_limit = input
-            .row
-            .as_ref()
-            .and_then(|x| x.cell_limit)
-            .unwrap_or(u32::from(u16::MAX)) as usize;
+        let row_cell_limit = input.row.cell_limit.unwrap_or(u32::from(u16::MAX)) as usize;
 
         let global_cell_limit = input
             .cell
@@ -519,7 +516,16 @@ impl Smoltable {
 
         let readers = locality_groups_to_scan
             .into_iter()
-            .map(|x| TableReader::new(instant, x, input.prefix.clone()).chunk_size(16_000))
+            .map(|locality_group| match &input.row.scan {
+                ScanMode::Prefix(prefix) => {
+                    TableReader::from_prefix(instant, locality_group, prefix)
+                }
+                ScanMode::Range(range) => unimplemented!(),
+                ScanMode::Ranges(ranges) => unimplemented!(),
+            })
+            .collect::<fjall::Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
             .collect::<Vec<_>>();
 
         let mut reader = MergeReader::new(readers);
@@ -536,6 +542,17 @@ impl Smoltable {
             };
 
             let cell = cell?;
+
+            // TODO: test with multiple partitions, can only break once ALL partitions have emitted row key that doesn't start with prefix
+            // TODO: Reader.finish() -> is_finished = true, short circuits next() to None?
+            match &input.row.scan {
+                ScanMode::Prefix(prefix) => {
+                    if !cell.row_key.starts_with(prefix) {
+                        break;
+                    }
+                }
+                _ => {}
+            }
 
             if let Some(filter) = column_filter {
                 if !cell.satisfies_column_filter(filter) {
@@ -555,7 +572,7 @@ impl Smoltable {
                     break;
                 }
 
-                if let Some(sample_rate) = input.row.as_ref().and_then(|x| x.sample) {
+                if let Some(sample_rate) = input.row.sample {
                     if sample_rate < 1.0 {
                         row_sample_counter += sample_rate;
 
@@ -633,7 +650,9 @@ impl Smoltable {
         Ok(fams)
     }
 
-    pub fn query_row(&self, input: QueryRowInput) -> fjall::Result<QueryRowOutput> {
+    pub fn get_row(&self, input: QueryRowInput) -> fjall::Result<QueryRowOutput> {
+        let global_cell_limit = input.row.cell_limit.unwrap_or(u32::from(u16::MAX));
+
         let column_cell_limit = input
             .column
             .as_ref()
@@ -645,7 +664,16 @@ impl Smoltable {
 
         let mut reader = SingleRowReader::new(self, self.keyspace.instant(), input)?;
 
+        let mut cell_count = 0; // Cell count over all aggregated columns
+
+        #[allow(clippy::explicit_counter_loop)]
         for cell in &mut reader {
+            // We are gonna visit another cell, if the global cell limit is reached
+            // we can short circuit out of the loop
+            if cell_count >= global_cell_limit {
+                break;
+            }
+
             let cell = cell?;
 
             // Append cell
@@ -662,9 +690,9 @@ impl Smoltable {
                 });
             }
 
-            // TODO: row cell limit
-
             // TODO: unit test cell limit with multiple columns etc
+
+            cell_count += 1;
         }
 
         let row = if columns.is_empty() {
@@ -675,8 +703,8 @@ impl Smoltable {
 
         Ok(QueryRowOutput {
             row,
-            cells_scanned_count: reader.cells_scanned_count,
-            bytes_scanned_count: reader.bytes_scanned_count,
+            cells_scanned_count: reader.cells_scanned_count(),
+            bytes_scanned_count: reader.bytes_scanned_count(),
         })
     }
 
@@ -719,784 +747,4 @@ impl Smoltable {
 
         bytes
     }
-}
-
-#[cfg(test)]
-mod tests {
-    /*  #[test]
-    pub fn smoltable_row_order() -> fjall::Result<()> {
-        let folder = tempfile::tempdir()?;
-
-        let keyspace = fjall::Config::new(folder.path()).open()?;
-        let table = open("test", keyspace.clone())?;
-
-        assert_eq!(0, table.list_column_families()?.len());
-
-        table.create_column_families(&CreateColumnFamilyInput {
-            column_families: vec![ColumnFamilyDefinition {
-                name: "value".to_owned(),
-                gc_settings: GarbageCollectionOptions {
-                    ttl_secs: None,
-                    version_limit: None,
-                },
-            }],
-            locality_group: None,
-        })?;
-
-        assert_eq!(1, table.list_column_families()?.len());
-
-        let mut writer = TableWriter::new(table.clone());
-
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#1".to_owned(),
-            cells: vec![writer::ColumnWriteItem {
-                column_key: ColumnKey::try_from("value:")
-                    .expect("should be valid column key"),
-                timestamp: Some(0),
-                value: CellValue::U8(1),
-            }],
-        })?;
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#2".to_owned(),
-            cells: vec![writer::ColumnWriteItem {
-                column_key: ColumnKey::try_from("value:")
-                    .expect("should be valid column key"),
-                timestamp: Some(0),
-                value: CellValue::U8(2),
-            }],
-        })?;
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#3".to_owned(),
-            cells: vec![writer::ColumnWriteItem {
-                column_key: ColumnKey::try_from("value:")
-                    .expect("should be valid column key"),
-                timestamp: Some(0),
-                value: CellValue::U8(3),
-            }],
-        })?;
-
-        writer.finalize()?;
-
-        let query_result = table.query_row(QueryInput {
-            cell_limit: None,
-            row_limit: None,
-            column_filter: None,
-            row_key: "".to_owned(),
-        })?;
-
-        assert_eq!(query_result.rows_scanned_count, 3);
-        assert_eq!(query_result.cells_scanned_count, 3);
-
-        assert_eq!(
-            serde_json::to_value(query_result.rows).unwrap(),
-            serde_json::json!([
-                {
-                    "row_key": "item#1",
-                    "columns": {
-                        "value": {
-                            "": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 1
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "row_key": "item#2",
-                    "columns": {
-                        "value": {
-                            "": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 2
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "row_key": "item#3",
-                    "columns": {
-                        "value": {
-                            "": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 3
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            ])
-        );
-
-        Ok(())
-    } */
-
-    /*   #[test]
-    pub fn smoltable_row_limit() -> fjall::Result<()> {
-        let folder = tempfile::tempdir()?;
-
-        let keyspace = fjall::Config::new(folder.path()).open()?;
-        let table = open("test", keyspace.clone())?;
-
-        assert_eq!(0, table.list_column_families()?.len());
-
-        table.create_column_families(&CreateColumnFamilyInput {
-            column_families: vec![ColumnFamilyDefinition {
-                name: "value".to_owned(),
-                gc_settings: GarbageCollectionOptions {
-                    ttl_secs: None,
-                    version_limit: None,
-                },
-            }],
-            locality_group: None,
-        })?;
-
-        assert_eq!(1, table.list_column_families()?.len());
-
-        let mut writer = TableWriter::new(table.clone());
-
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#1".to_owned(),
-            cells: vec![writer::ColumnWriteItem {
-                column_key: ColumnKey::try_from("value:")
-                    .expect("should be valid column key"),
-                timestamp: Some(0),
-                value: CellValue::U8(1),
-            }],
-        })?;
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#2".to_owned(),
-            cells: vec![writer::ColumnWriteItem {
-                column_key: ColumnKey::try_from("value:")
-                    .expect("should be valid column key"),
-                timestamp: Some(0),
-                value: CellValue::U8(2),
-            }],
-        })?;
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#3".to_owned(),
-            cells: vec![writer::ColumnWriteItem {
-                column_key: ColumnKey::try_from("value:")
-                    .expect("should be valid column key"),
-                timestamp: Some(0),
-                value: CellValue::U8(3),
-            }],
-        })?;
-
-        writer.finalize()?;
-
-        let query_result = table.query(QueryInput {
-            cell_limit: None,
-            row_limit: Some(1),
-            column_filter: None,
-            row_key: "item#".to_owned(),
-        })?;
-
-        assert_eq!(
-            serde_json::to_value(query_result.rows).unwrap(),
-            serde_json::json!([
-                {
-                    "row_key": "item#1",
-                    "columns": {
-                        "value": {
-                            "": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 1
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            ])
-        );
-
-        Ok(())
-    } */
-
-    /* #[test]
-    pub fn smoltable_simple_column_filter() -> fjall::Result<()> {
-        let folder = tempfile::tempdir()?;
-
-        let keyspace = fjall::Config::new(folder.path()).open()?;
-        let table = open("test", keyspace.clone())?;
-
-        assert_eq!(0, table.list_column_families()?.len());
-
-        table.create_column_families(&CreateColumnFamilyInput {
-            column_families: vec![
-                ColumnFamilyDefinition {
-                    name: "value".to_owned(),
-                    gc_settings: GarbageCollectionOptions {
-                    ttl_secs: None,
-                    version_limit: None,
-                },
-                },
-                ColumnFamilyDefinition {
-                    name: "other".to_owned(),
-                    gc_settings: GarbageCollectionOptions {
-                    ttl_secs: None,
-                    version_limit: None,
-                },
-                },
-            ],
-            locality_group: None,
-        })?;
-
-        assert_eq!(2, table.list_column_families()?.len());
-
-        let mut writer = TableWriter::new(table.clone());
-
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#1".to_owned(),
-            cells: vec![
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(1),
-                },
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("other:asd")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(44),
-                },
-            ],
-        })?;
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#2".to_owned(),
-            cells: vec![
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(2),
-                },
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("other:asd")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(45),
-                },
-            ],
-        })?;
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#3".to_owned(),
-            cells: vec![
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(3),
-                },
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("other:asd")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(46),
-                },
-            ],
-        })?;
-
-        writer.finalize()?;
-
-        let query_result = table.query(QueryInput {
-            cell_limit: None,
-            row_limit: None,
-            column_filter: Some(
-                ColumnKey::try_from("other:").expect("should be valid column key"),
-            ),
-            row_key: "item#".to_owned(),
-        })?;
-
-        assert_eq!(
-            serde_json::to_value(query_result.rows).unwrap(),
-            serde_json::json!([
-                {
-                    "row_key": "item#1",
-                    "columns": {
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 44
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "row_key": "item#2",
-                    "columns": {
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 45
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "row_key": "item#3",
-                    "columns": {
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 46
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            ])
-        );
-
-        let query_result = table.query(QueryInput {
-            cell_limit: None,
-            row_limit: None,
-            column_filter: Some(
-                ColumnKey::try_from("other:asd").expect("should be valid column key"),
-            ),
-            row_key: "item#".to_owned(),
-        })?;
-
-        assert_eq!(
-            serde_json::to_value(query_result.rows).unwrap(),
-            serde_json::json!([
-                {
-                    "row_key": "item#1",
-                    "columns": {
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 44
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "row_key": "item#2",
-                    "columns": {
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 45
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "row_key": "item#3",
-                    "columns": {
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 46
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            ])
-        );
-
-        Ok(())
-    } */
-
-    /* #[test]
-    pub fn smoltable_multiple_column_families() -> fjall::Result<()> {
-        let folder = tempfile::tempdir()?;
-
-        let keyspace = fjall::Config::new(folder.path()).open()?;
-        let table = open("test", keyspace.clone())?;
-
-        assert_eq!(0, table.list_column_families()?.len());
-
-        table.create_column_families(&CreateColumnFamilyInput {
-            column_families: vec![
-                ColumnFamilyDefinition {
-                    name: "value".to_owned(),
-                    gc_settings: GarbageCollectionOptions {
-                    ttl_secs: None,
-                    version_limit: None,
-                },
-                },
-                ColumnFamilyDefinition {
-                    name: "other".to_owned(),
-                    gc_settings: GarbageCollectionOptions {
-                    ttl_secs: None,
-                    version_limit: None,
-                },
-                },
-            ],
-            locality_group: None,
-        })?;
-
-        assert_eq!(2, table.list_column_families()?.len());
-
-        let mut writer = TableWriter::new(table.clone());
-
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#1".to_owned(),
-            cells: vec![
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(1),
-                },
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("other:asd")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(44),
-                },
-            ],
-        })?;
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#2".to_owned(),
-            cells: vec![
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(2),
-                },
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("other:asd")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(45),
-                },
-            ],
-        })?;
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#3".to_owned(),
-            cells: vec![
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(3),
-                },
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("other:asd")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(46),
-                },
-            ],
-        })?;
-
-        writer.finalize()?;
-
-        let query_result = table.query(QueryInput {
-            cell_limit: None,
-            row_limit: None,
-            column_filter: None,
-            row_key: "".to_owned(),
-        })?;
-
-        assert_eq!(query_result.rows_scanned_count, 3);
-        assert_eq!(query_result.cells_scanned_count, 6);
-
-        assert_eq!(
-            serde_json::to_value(query_result.rows).unwrap(),
-            serde_json::json!([
-                {
-                    "row_key": "item#1",
-                    "columns": {
-                        "value": {
-                            "": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 1
-                                    }
-                                }
-                            ]
-                        },
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 44
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "row_key": "item#2",
-                    "columns": {
-                        "value": {
-                            "": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 2
-                                    }
-                                }
-                            ]
-                        },
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 45
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "row_key": "item#3",
-                    "columns": {
-                        "value": {
-                            "": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 3
-                                    }
-                                }
-                            ]
-                        },
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 46
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            ])
-        );
-
-        Ok(())
-    } */
-
-    /*  #[test]
-    pub fn smoltable_multiple_column_families_in_locality_groups() -> fjall::Result<()> {
-        let folder = tempfile::tempdir()?;
-
-        let keyspace = fjall::Config::new(folder.path()).open()?;
-        let table = open("test", keyspace.clone())?;
-
-        assert_eq!(0, table.list_column_families()?.len());
-
-        table.create_column_families(&CreateColumnFamilyInput {
-            column_families: vec![ColumnFamilyDefinition {
-                name: "value".to_owned(),
-                gc_settings: GarbageCollectionOptions {
-                    ttl_secs: None,
-                    version_limit: None,
-                },
-            }],
-            locality_group: None,
-        })?;
-
-        table.create_column_families(&CreateColumnFamilyInput {
-            column_families: vec![ColumnFamilyDefinition {
-                name: "other".to_owned(),
-                gc_settings: GarbageCollectionOptions {
-                    ttl_secs: None,
-                    version_limit: None,
-                },
-            }],
-            locality_group: Some(true),
-        })?;
-
-        assert_eq!(2, table.list_column_families()?.len());
-
-        let mut writer = TableWriter::new(table.clone());
-
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#1".to_owned(),
-            cells: vec![
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(1),
-                },
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("other:asd")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(44),
-                },
-            ],
-        })?;
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#2".to_owned(),
-            cells: vec![
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(2),
-                },
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("other:asd")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(45),
-                },
-            ],
-        })?;
-        writer.write(&writer::RowWriteItem {
-            row_key: "item#3".to_owned(),
-            cells: vec![
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("value:")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(3),
-                },
-                writer::ColumnWriteItem {
-                    column_key: ColumnKey::try_from("other:asd")
-                        .expect("should be valid column key"),
-                    timestamp: Some(0),
-                    value: CellValue::U8(46),
-                },
-            ],
-        })?;
-
-        writer.finalize()?;
-
-        let query_result = table.query(QueryInput {
-            cell_limit: None,
-            row_limit: None,
-            column_filter: None,
-            row_key: "".to_owned(),
-        })?;
-
-        assert_eq!(query_result.rows_scanned_count, 3);
-        assert_eq!(query_result.cells_scanned_count, 6);
-
-        assert_eq!(
-            serde_json::to_value(query_result.rows).unwrap(),
-            serde_json::json!([
-                {
-                    "row_key": "item#1",
-                    "columns": {
-                        "value": {
-                            "": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 1
-                                    }
-                                }
-                            ]
-                        },
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 44
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "row_key": "item#2",
-                    "columns": {
-                        "value": {
-                            "": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 2
-                                    }
-                                }
-                            ]
-                        },
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 45
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "row_key": "item#3",
-                    "columns": {
-                        "value": {
-                            "": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 3
-                                    }
-                                }
-                            ]
-                        },
-                        "other": {
-                            "asd": [
-                                {
-                                    "timestamp": 0,
-                                    "value": {
-                                        "U8": 46
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            ])
-        );
-
-        Ok(())
-    } */
 }

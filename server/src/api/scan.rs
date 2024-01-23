@@ -10,9 +10,9 @@ use actix_web::{
     HttpResponse,
 };
 use serde_json::json;
-use smoltable::{query::prefix::Input as QueryPrefixInput, TableWriter};
+use smoltable::{query::scan::Input as QueryPrefixInput, TableWriter};
 
-#[post("/v1/table/{name}/prefix")]
+#[post("/v1/table/{name}/scan")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
@@ -43,7 +43,13 @@ pub async fn handler(
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let result = table.query_prefix(req_body.0)?;
+        let result = {
+            let table = table.clone();
+
+            tokio::task::spawn_blocking(move || table.scan(req_body.0))
+                .await
+                .expect("should join")
+        }?;
 
         let dur = before.elapsed();
 
@@ -90,7 +96,7 @@ pub async fn handler(
 
         Ok(build_response(
             dur,
-            StatusCode::CONFLICT,
+            StatusCode::NOT_FOUND,
             "Table not found",
             &json!(null),
         ))

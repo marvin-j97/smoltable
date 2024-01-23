@@ -9,8 +9,7 @@ use smoltable::{
 use test_log::test;
 
 #[test]
-pub fn smoltable_write_read_row_multi_column_filter_multiple_locality_groups() -> fjall::Result<()>
-{
+pub fn read_row_multi_column_filter_multiple_locality_groups() -> fjall::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;
@@ -68,7 +67,7 @@ pub fn smoltable_write_read_row_multi_column_filter_multiple_locality_groups() -
 
     writer.finalize()?;
 
-    let query_result = table.query_row(QueryRowInput {
+    let query_result = table.get_row(QueryRowInput {
         // cell: None,
         column: Some(QueryRowInputColumnOptions {
             filter: Some(ColumnFilter::Multi(vec![ColumnKey::try_from(
@@ -79,6 +78,7 @@ pub fn smoltable_write_read_row_multi_column_filter_multiple_locality_groups() -
         }),
         row: QueryRowInputRowOptions {
             key: "test".to_owned(),
+            cell_limit: None,
         },
     })?;
 
@@ -103,7 +103,7 @@ pub fn smoltable_write_read_row_multi_column_filter_multiple_locality_groups() -
         })
     );
 
-    let query_result = table.query_row(QueryRowInput {
+    let query_result = table.get_row(QueryRowInput {
         // cell: None,
         column: Some(QueryRowInputColumnOptions {
             filter: Some(ColumnFilter::Key(ColumnKey::try_from("another:").unwrap())),
@@ -111,6 +111,7 @@ pub fn smoltable_write_read_row_multi_column_filter_multiple_locality_groups() -
         }),
         row: QueryRowInputRowOptions {
             key: "test".to_owned(),
+            cell_limit: None,
         },
     })?;
 

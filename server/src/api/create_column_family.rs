@@ -70,7 +70,7 @@ pub async fn handler(
     } else {
         Ok(build_response(
             before.elapsed(),
-            StatusCode::CONFLICT,
+            StatusCode::NOT_FOUND,
             "Table not found",
             &json!(null),
         ))

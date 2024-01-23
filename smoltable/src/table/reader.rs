@@ -1,13 +1,12 @@
 use crate::VisitedCell;
 use fjall::{PartitionHandle, Snapshot};
-use std::{collections::VecDeque, ops::Bound};
+use std::{collections::VecDeque, ops::Bound, sync::Arc};
 
-/// Stupidly iterates through a prefixed set of cells
+/// Stupidly iterates through cells
 pub struct Reader {
     pub partition: PartitionHandle,
     snapshot: Snapshot,
-    prefix: String,
-    range: Option<(Bound<Vec<u8>>, Bound<Vec<u8>>)>,
+    current_range_start: Bound<Arc<[u8]>>,
 
     buffer: VecDeque<VisitedCell>,
 
@@ -17,21 +16,18 @@ pub struct Reader {
     chunk_size: usize,
 }
 
-impl std::fmt::Display for Reader {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "TableReader({:?})", self.prefix)
-    }
-}
-
 impl Reader {
-    pub fn new(instant: fjall::Instant, locality_group: PartitionHandle, prefix: String) -> Self {
+    pub fn new(
+        instant: fjall::Instant,
+        locality_group: PartitionHandle,
+        range: Bound<Arc<[u8]>>,
+    ) -> Self {
         let snapshot = locality_group.snapshot_at(instant);
 
         Self {
             partition: locality_group,
             snapshot,
-            prefix,
-            range: None,
+            current_range_start: range,
             buffer: VecDeque::with_capacity(1_000),
             cells_scanned_count: 0,
             bytes_scanned_count: 0,
@@ -39,28 +35,42 @@ impl Reader {
         }
     }
 
+    pub fn from_prefix(
+        instant: fjall::Instant,
+        locality_group: PartitionHandle,
+        prefix: &str,
+    ) -> fjall::Result<Option<Self>> {
+        let Some(range) = Self::get_range_start_from_prefix(instant, &locality_group, prefix)?
+        else {
+            return Ok(None);
+        };
+
+        let reader =
+            Self::new(instant, locality_group, std::ops::Bound::Included(range)).chunk_size(16_000);
+
+        Ok(Some(reader))
+    }
+
     pub fn chunk_size(mut self, n: usize) -> Self {
         self.chunk_size = n;
         self
     }
 
-    fn initialize_range(&mut self) -> Option<fjall::Result<()>> {
-        use std::ops::Bound::{Included, Unbounded};
-
-        let item = self
-            .snapshot
-            .prefix(self.prefix.as_bytes())
-            .into_iter()
-            .next()?;
+    pub fn get_range_start_from_prefix(
+        instant: fjall::Instant,
+        locality_group: &PartitionHandle,
+        prefix: &str,
+    ) -> fjall::Result<Option<Arc<[u8]>>> {
+        let snapshot = locality_group.snapshot_at(instant);
+        let item = snapshot.prefix(prefix.as_bytes()).into_iter().next();
 
         match item {
-            Ok((first_key, _)) => {
-                self.range = Some((Included(first_key.to_vec()), Unbounded));
+            Some(item) => {
+                let (key, _) = item?;
+                Ok(Some(key))
             }
-            Err(e) => return Some(Err(fjall::Error::Storage(e))),
+            None => Ok(None),
         }
-
-        Some(Ok(()))
     }
 
     // TODO: try to make Peek return a &smoltable::VisitedCell
@@ -72,26 +82,15 @@ impl Reader {
             return Some(Ok(cell));
         }
 
-        // Get initial range start
-        if self.range.is_none() {
-            if let Err(e) = self.initialize_range()? {
-                return Some(Err(e));
-            }
-        }
-
-        let mut range = self.range.clone().unwrap();
+        let mut current_range_start = self.current_range_start.clone();
 
         loop {
             // Advance range by querying chunks
             match self
                 .snapshot
-                .range(range.clone())
+                .range((current_range_start.clone(), Unbounded))
                 .into_iter()
                 .take(self.chunk_size)
-                .filter(|x| match x {
-                    Ok((key, _)) => key.starts_with(self.prefix.as_bytes()),
-                    Err(_) => true,
-                })
                 .collect::<Result<Vec<_>, fjall::LsmError>>()
             {
                 Ok(chunk) => {
@@ -106,7 +105,7 @@ impl Reader {
                         .sum::<u64>();
 
                     let (last_key, _) = chunk.last().unwrap();
-                    range = (Excluded(last_key.to_vec()), Unbounded);
+                    current_range_start = Excluded(last_key.clone());
 
                     self.buffer.extend(
                         chunk
@@ -116,7 +115,7 @@ impl Reader {
                     );
 
                     if let Some(cell) = self.buffer.front().cloned() {
-                        self.range = Some(range);
+                        self.current_range_start = current_range_start;
                         return Some(Ok(cell));
                     }
                 }

@@ -9,7 +9,7 @@ use smoltable::{
 use test_log::test;
 
 #[test]
-pub fn write_read_row_multi_column_filter() -> fjall::Result<()> {
+pub fn read_row_simple_column_filter() -> fjall::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;
@@ -33,18 +33,11 @@ pub fn write_read_row_multi_column_filter() -> fjall::Result<()> {
                     version_limit: None,
                 },
             },
-            ColumnFamilyDefinition {
-                name: "another_one".to_owned(),
-                gc_settings: GarbageCollectionOptions {
-                    ttl_secs: None,
-                    version_limit: None,
-                },
-            },
         ],
         locality_group: None,
     })?;
 
-    assert_eq!(3, table.list_column_families()?.len());
+    assert_eq!(2, table.list_column_families()?.len());
 
     let mut writer = TableWriter::new(table.clone());
 
@@ -52,31 +45,24 @@ pub fn write_read_row_multi_column_filter() -> fjall::Result<()> {
         "test",
         vec![
             smoltable::cell!("value:", Some(0), CellValue::String("hello".to_owned())),
-            smoltable::cell!("another:", Some(0), CellValue::String("hello2".to_owned())),
-            smoltable::cell!(
-                "another_one:",
-                Some(0),
-                CellValue::String("hello3".to_owned())
-            )
+            smoltable::cell!("another:", Some(0), CellValue::String("hello2".to_owned()))
         ]
     ))?;
 
     writer.finalize()?;
 
-    let query_result = table.query_row(QueryRowInput {
+    let query_result = table.get_row(QueryRowInput {
         column: Some(QueryRowInputColumnOptions {
-            filter: Some(ColumnFilter::Multi(vec![
-                ColumnKey::try_from("value:").unwrap(),
-                ColumnKey::try_from("another_one:").unwrap(),
-            ])),
+            filter: Some(ColumnFilter::Key(ColumnKey::try_from("value:").unwrap())),
             cell_limit: None,
         }),
         row: QueryRowInputRowOptions {
             key: "test".to_owned(),
+            cell_limit: None,
         },
     })?;
 
-    assert_eq!(query_result.cells_scanned_count, 3);
+    assert_eq!(query_result.cells_scanned_count, 1);
 
     assert_eq!(
         serde_json::to_value(query_result.row).unwrap(),
@@ -89,16 +75,6 @@ pub fn write_read_row_multi_column_filter() -> fjall::Result<()> {
                             "timestamp": 0,
                             "value": {
                                 "String": "hello"
-                            }
-                        }
-                    ]
-                },
-                "another_one": {
-                    "": [
-                        {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello3"
                             }
                         }
                     ]

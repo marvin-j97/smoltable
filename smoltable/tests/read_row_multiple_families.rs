@@ -1,15 +1,12 @@
 use smoltable::{
-    query::row::{
-        ColumnOptions as QueryRowInputColumnOptions, Input as QueryRowInput,
-        RowOptions as QueryRowInputRowOptions,
-    },
-    CellValue, ColumnFamilyDefinition, ColumnFilter, ColumnKey, CreateColumnFamilyInput,
-    GarbageCollectionOptions, Smoltable, TableWriter,
+    query::row::{Input as QueryRowInput, RowOptions as QueryRowInputRowOptions},
+    CellValue, ColumnFamilyDefinition, CreateColumnFamilyInput, GarbageCollectionOptions,
+    Smoltable, TableWriter,
 };
 use test_log::test;
 
 #[test]
-pub fn write_read_row_simple_column_filter() -> fjall::Result<()> {
+pub fn read_row_multiple_families() -> fjall::Result<()> {
     let folder = tempfile::tempdir()?;
 
     let keyspace = fjall::Config::new(folder.path()).open()?;
@@ -51,17 +48,15 @@ pub fn write_read_row_simple_column_filter() -> fjall::Result<()> {
 
     writer.finalize()?;
 
-    let query_result = table.query_row(QueryRowInput {
-        column: Some(QueryRowInputColumnOptions {
-            filter: Some(ColumnFilter::Key(ColumnKey::try_from("value:").unwrap())),
-            cell_limit: None,
-        }),
+    let query_result = table.get_row(QueryRowInput {
+        column: None,
         row: QueryRowInputRowOptions {
             key: "test".to_owned(),
+            cell_limit: None,
         },
     })?;
 
-    assert_eq!(query_result.cells_scanned_count, 1);
+    assert_eq!(query_result.cells_scanned_count, 2);
 
     assert_eq!(
         serde_json::to_value(query_result.row).unwrap(),
@@ -74,6 +69,16 @@ pub fn write_read_row_simple_column_filter() -> fjall::Result<()> {
                             "timestamp": 0,
                             "value": {
                                 "String": "hello"
+                            }
+                        }
+                    ]
+                },
+                "another": {
+                    "": [
+                        {
+                            "timestamp": 0,
+                            "value": {
+                                "String": "hello2"
                             }
                         }
                     ]

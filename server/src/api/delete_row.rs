@@ -52,7 +52,13 @@ pub async fn handler(
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let count = table.delete_row(req_body.row_key.clone())?;
+        let count = {
+            let table = table.clone();
+
+            tokio::task::spawn_blocking(move || table.delete_row(req_body.row_key.clone()))
+                .await
+                .expect("should join")
+        }?;
 
         let micros_total = before.elapsed().as_micros();
 
@@ -84,7 +90,7 @@ pub async fn handler(
     } else {
         Ok(build_response(
             before.elapsed(),
-            StatusCode::CONFLICT,
+            StatusCode::NOT_FOUND,
             "Table not found",
             &json!(null),
         ))

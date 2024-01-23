@@ -49,7 +49,13 @@ pub async fn handler(
     }
 
     if let Some(table) = tables.get(&table_name) {
-        let result = table.multi_get(req_body.items.clone())?;
+        let result = {
+            let table = table.clone();
+
+            tokio::task::spawn_blocking(move || table.multi_get(req_body.items.clone()))
+                .await
+                .expect("should join")
+        }?;
 
         let dur = before.elapsed();
 
@@ -86,7 +92,7 @@ pub async fn handler(
     } else {
         Ok(build_response(
             before.elapsed(),
-            StatusCode::CONFLICT,
+            StatusCode::NOT_FOUND,
             "Table not found",
             &json!(null),
         ))
