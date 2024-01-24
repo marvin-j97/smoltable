@@ -284,7 +284,15 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
 async fn main() -> smoltable::Result<()> {
     env_logger::Builder::from_default_env().init();
 
-    log::info!("{} {}", env!("CARGO_CRATE_NAME"), env!("CARGO_PKG_VERSION"));
+    eprint!("\n");
+    eprintln!("                    | | |      | |   | |     ");
+    eprintln!("  ___ _ __ ___   ___ | | |_ __ _| |__ | | ___ ");
+    eprintln!(" / __| '_ ` _ \\ / _ \\| | __/ _` | '_ \\| |/ _ \\");
+    eprintln!(" \\__ \\ | | | | | (_) | | || (_| | |_) | |  __/");
+    eprintln!(" |___/_| |_| |_|\\___/|_|\\__\\__,_|_.__/|_|\\___|");
+    eprint!("\n");
+
+    log::info!("smoltable server {}", env!("CARGO_PKG_VERSION"));
     let port = get_port();
 
     // NOTE: Block cache should be pretty small, because it will be mostly used for
