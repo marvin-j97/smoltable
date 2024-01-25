@@ -24,4 +24,4 @@ tempfile = "3.9.0"
 nanoid = "0.4.0"
 
 # NOTE: Don't need bloom filters, because we always do prefix queries for pretty much everything
-fjall = { version = "0.6.0" }
+fjall = { version = "0.6.1" }
