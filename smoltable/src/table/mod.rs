@@ -303,7 +303,7 @@ impl Smoltable {
 
         let readers = locality_groups_to_scan
             .into_iter()
-            .map(|x| TableReader::new(instant, x, std::ops::Bound::Unbounded).chunk_size(100_000))
+            .map(|x| TableReader::new(instant, x, std::ops::Bound::Unbounded).chunk_size(64_000))
             .collect::<Vec<_>>();
 
         let mut current_row_key = None;
@@ -369,7 +369,7 @@ impl Smoltable {
 
         let mut readers = locality_groups_to_scan
             .into_iter()
-            .map(|x| TableReader::new(instant, x, std::ops::Bound::Unbounded))
+            .map(|x| TableReader::new(instant, x, std::ops::Bound::Unbounded).chunk_size(64_000))
             .collect::<Vec<_>>();
 
         let mut current_row_key = None;

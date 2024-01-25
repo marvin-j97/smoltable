@@ -13,7 +13,7 @@ pub struct Reader {
     pub cells_scanned_count: u64,
     pub bytes_scanned_count: u64,
 
-    chunk_size: usize,
+    pub chunk_size: usize,
 }
 
 impl Reader {
@@ -31,8 +31,13 @@ impl Reader {
             buffer: VecDeque::with_capacity(1_000),
             cells_scanned_count: 0,
             bytes_scanned_count: 0,
-            chunk_size: 1_000,
+            chunk_size: 10,
         }
+    }
+
+    pub fn chunk_size(mut self, n: usize) -> Self {
+        self.chunk_size = n;
+        self
     }
 
     pub fn from_prefix(
@@ -45,15 +50,9 @@ impl Reader {
             return Ok(None);
         };
 
-        let reader =
-            Self::new(instant, locality_group, std::ops::Bound::Included(range)).chunk_size(16_000);
+        let reader = Self::new(instant, locality_group, std::ops::Bound::Included(range));
 
         Ok(Some(reader))
-    }
-
-    pub fn chunk_size(mut self, n: usize) -> Self {
-        self.chunk_size = n;
-        self
     }
 
     pub fn get_range_start_from_prefix(
@@ -85,14 +84,17 @@ impl Reader {
         let mut current_range_start = self.current_range_start.clone();
 
         loop {
-            // Advance range by querying chunks
-            match self
+            let collected = self
                 .snapshot
                 .range((current_range_start.clone(), Unbounded))
                 .into_iter()
                 .take(self.chunk_size)
-                .collect::<Result<Vec<_>, fjall::LsmError>>()
-            {
+                .collect::<Result<Vec<_>, fjall::LsmError>>();
+
+            self.chunk_size = (self.chunk_size * 2).min(64_000);
+
+            // Advance range by querying chunks
+            match collected {
                 Ok(chunk) => {
                     if chunk.is_empty() {
                         return None;
