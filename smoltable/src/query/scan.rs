@@ -34,9 +34,9 @@ pub struct RowOptions {
 pub struct ColumnOptions {
     pub cell_limit: Option<u32>,
 
-    // pub start, end: Option<Range>, // TODO: .......
-
     // TODO: column limit
+
+    // pub start, end: Option<Range>, // TODO: .......
     #[serde(flatten)]
     pub filter: Option<ColumnFilter>,
 }

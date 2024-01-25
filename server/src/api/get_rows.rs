@@ -76,6 +76,8 @@ pub async fn handler(
         )
         .ok();
 
+        /* TODO: affected_locality_groups */
+
         Ok(build_response(
             dur,
             StatusCode::OK,

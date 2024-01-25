@@ -76,6 +76,8 @@ pub async fn handler(
             .map(|x| x.columns.values().map(|x| x.len()).sum::<usize>())
             .sum::<usize>();
 
+        /* TODO: affected_locality_groups */
+
         Ok(build_response(
             dur,
             StatusCode::OK,

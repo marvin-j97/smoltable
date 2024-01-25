@@ -11,16 +11,16 @@ pub struct RowOptions {
 pub struct ColumnOptions {
     pub cell_limit: Option<u32>,
 
-    // pub start, end: Option<Range>, // TODO: .......
-
     // TODO: column limit
+
+    // pub start, end: Option<Range>, // TODO: .......
     #[serde(flatten)]
     pub filter: Option<ColumnFilter>,
 }
 
-// TODO:
 /* #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CellOptions {
+    // TODO: limit versions per cell
     // pub time: Option<Range>, // TODO:
 } */
 

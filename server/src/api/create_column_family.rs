@@ -11,6 +11,8 @@ use actix_web::{
 use serde_json::json;
 use smoltable::CreateColumnFamilyInput;
 
+/* TODO: gc_settings should be optional */
+
 #[post("/v1/table/{name}/column-family")]
 pub async fn handler(
     path: Path<String>,
