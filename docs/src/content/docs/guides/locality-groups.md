@@ -5,7 +5,7 @@ description: Using locality groups
 
 If we need to read columns of a specific column family for many rows (using a common prefix), scan performance will degrade as column families increase in size.
 
-Consider the [`webtable` example](/guides/wide-column-intro/#real-life-example-webtable):
+Consider the [`webtable` example](/smoltable/guides/wide-column-intro/#real-life-example-webtable):
 
 If we wanted to get the language of all com.* pages, we would need to scan following column families:
 

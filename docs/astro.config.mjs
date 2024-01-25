@@ -7,6 +7,7 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Smoltable',
+			// TODO: edit URL
 			social: {
 				github: 'https://github.com/marvin-j97/smoltable',
 			},
