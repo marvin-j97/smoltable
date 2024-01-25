@@ -17,7 +17,7 @@ If we wanted to get the language of all com.* pages, we would need to scan follo
 
 To combat this, we can define a *locality group*, which can house multiple column families. Each locality group is stored in its own LSM-tree (a single partition inside the storage engine), but row mutations across column families stay atomic.
 
-![Webtable locality groups](/webtable-locality.png)
+![Webtable locality groups](/smoltable/webtable-locality.png)
 
 :::tip
 Store column families in their own locality group if they are not queried frequently, especially if they store a large chunks of data per row.

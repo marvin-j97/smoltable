@@ -83,6 +83,15 @@ pub struct GarbageCollectionOptions {
     pub ttl_secs: Option<u64>,
 }
 
+impl Default for GarbageCollectionOptions {
+    fn default() -> Self {
+        Self {
+            ttl_secs: None,
+            version_limit: None,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ColumnFamilyDefinition {
     pub name: String,

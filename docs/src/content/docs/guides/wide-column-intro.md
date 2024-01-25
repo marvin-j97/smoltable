@@ -7,7 +7,7 @@ Like Bigtable, Smoltable is a wide-column database. It could be described as a *
 
 The row key is not necessarily the same as the primary key in a relational database: A row in general is not a fixed structure like in a relational database. Each row may contain arbitrarily many columns, grouped into column families. Column families must be defined upfront, but column qualifiers (column names) can be defined dynamically, and do not need to adhere to a fixed schema. Because the table is sparse, unused columns do not cost any disk space. Retrieving specific columns does not require retrieving the entire row.
 
-![Wide column table](/wide-column.png)
+![Wide column table](/smoltable/wide-column.png)
 
 Each row’s cells are sorted by the column key (family + qualifier), and a timestamp: this results in a multi-dimensional key:
 
@@ -35,11 +35,7 @@ As mentioned before, there are no secondary indices and no query planner. The or
 
 When using multiple components in a row key, sorting them by cardinality generally optimizes locality and allows better querying. Compare:
 
-`CONTINENT#COUNTRY#CITY`
-
-vs.
-
-`CITY#COUNTRY#CONTINENT`
+`<CONTINENT>#<COUNTRY>#<CITY>` and `<CITY>#<COUNTRY>#<CONTINENT>`.
 
 The second row key will always perform a full table scan if we search only for a specific continent or country, because we cannot use a prefix.
 
@@ -63,7 +59,7 @@ The *webtable,* the heart of the Google search engine, is stored in Bigtable. It
 
 The row key is the reversed domain key. This maximizes locality of pages under the same (sub-)domain.
 
-![Webtable](/webtable.png)
+![Webtable](/smoltable/webtable.png)
 
 By listing the anchors of a row, we can count how many websites link to this specific page (for example to calculate the *PageRank*).
 

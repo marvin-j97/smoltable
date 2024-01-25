@@ -39,10 +39,36 @@ pub async fn handler(
         ));
     }
 
-    if tables.get(&table_name).is_some() {
+    if let Some(table) = tables.get(&table_name).cloned() {
         app_state.manifest_table.delete_user_table(&table_name)?;
         tables.remove(&table_name);
-        // TODO: delete partition(s)
+
+        app_state
+            .keyspace
+            .delete_partition(table.manifest.clone())
+            .map_err(smoltable::Error::Storage)?;
+
+        app_state
+            .keyspace
+            .delete_partition(table.metrics.manifest.clone())
+            .map_err(smoltable::Error::Storage)?;
+
+        app_state
+            .keyspace
+            .delete_partition(table.metrics.tree.clone())
+            .map_err(smoltable::Error::Storage)?;
+
+        for locality_group in &*table.locality_groups.read().expect("lock is poisoned") {
+            app_state
+                .keyspace
+                .delete_partition(locality_group.tree.clone())
+                .map_err(smoltable::Error::Storage)?;
+        }
+
+        app_state
+            .keyspace
+            .delete_partition(table.tree.clone())
+            .map_err(smoltable::Error::Storage)?;
 
         let micros = before.elapsed().as_micros();
 

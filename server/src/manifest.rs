@@ -71,7 +71,10 @@ impl ManifestTable {
     }
 
     pub fn delete_user_table(&self, table_name: &str) -> smoltable::Result<()> {
-        self.tree.remove(format!("table#{table_name}#name"))?;
+        for item in &self.tree.prefix(format!("table#{table_name}#")) {
+            let (k, _) = item?;
+            self.tree.remove(k)?;
+        }
         Ok(())
     }
 }

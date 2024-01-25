@@ -8,16 +8,36 @@ use actix_web::{
     web::{self, Path},
     HttpResponse,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::json;
-use smoltable::CreateColumnFamilyInput;
+use smoltable::{ColumnFamilyDefinition, CreateColumnFamilyInput, GarbageCollectionOptions};
 
-/* TODO: gc_settings should be optional */
+#[derive(Debug, Deserialize, Serialize)]
+struct ColumnFamilyDefinitionInput {
+    pub name: String,
+    pub gc_settings: Option<GarbageCollectionOptions>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Input {
+    pub column_families: Vec<ColumnFamilyDefinitionInput>,
+    pub locality_group: Option<bool>,
+}
+
+impl From<ColumnFamilyDefinitionInput> for ColumnFamilyDefinition {
+    fn from(val: ColumnFamilyDefinitionInput) -> Self {
+        ColumnFamilyDefinition {
+            name: val.name,
+            gc_settings: val.gc_settings.unwrap_or_default(),
+        }
+    }
+}
 
 #[post("/v1/table/{name}/column-family")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
-    req_body: web::Json<CreateColumnFamilyInput>,
+    req_body: web::Json<Input>,
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
@@ -61,7 +81,17 @@ pub async fn handler(
             }
         }
 
-        table.create_column_families(&req_body.0)?;
+        let column_families = req_body
+            .0
+            .column_families
+            .into_iter()
+            .map(Into::into)
+            .collect();
+
+        table.create_column_families(&CreateColumnFamilyInput {
+            column_families,
+            locality_group: req_body.0.locality_group,
+        })?;
 
         Ok(build_response(
             before.elapsed(),

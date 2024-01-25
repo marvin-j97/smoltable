@@ -1,6 +1,7 @@
 #[derive(Debug)]
 pub enum Error {
     Storage(fjall::Error),
+    Tree(fjall::LsmError),
     Io(std::io::Error),
 }
 
@@ -21,6 +22,12 @@ impl From<fjall::Error> for Error {
 impl From<std::io::Error> for Error {
     fn from(value: std::io::Error) -> Self {
         Error::Io(value)
+    }
+}
+
+impl From<fjall::LsmError> for Error {
+    fn from(value: fjall::LsmError) -> Self {
+        Error::Tree(value)
     }
 }
 

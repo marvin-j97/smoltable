@@ -27,4 +27,10 @@ impl From<std::io::Error> for CustomHttpError {
     }
 }
 
+impl From<fjall::LsmError> for CustomHttpError {
+    fn from(value: fjall::LsmError) -> Self {
+        Self(smoltable::Error::from(value))
+    }
+}
+
 pub type CustomRouteResult<T> = Result<T, CustomHttpError>;

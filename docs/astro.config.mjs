@@ -7,7 +7,9 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Smoltable',
-			// TODO: edit URL
+			editLink: {
+				baseUrl: "https://github.com/marvin-j97/smoltable/edit/main/docs"
+			},
 			social: {
 				github: 'https://github.com/marvin-j97/smoltable',
 			},
@@ -15,7 +17,7 @@ export default defineConfig({
 				{
 					label: 'Guides',
 					items: [
-						{ label: 'What is Smoltable?', link: '/guides/intro/' },
+						{ label: 'What is Smoltable?', link: '/' },
 						{ label: 'Installation', link: '/guides/installation/' },
 						{ label: 'Wide-column data design', link: '/guides/wide-column-intro/' },
 						{ label: 'Column keys', link: '/guides/column-keys' },
