@@ -8,8 +8,9 @@ pub fn data_folder() -> PathBuf {
 
 /// Gets HTTP port
 pub fn get_port() -> u16 {
-    let port = std::env::var("PORT")
+    let port = std::env::var("SMOLTABLE_HTTP_PORT")
         .or_else(|_| std::env::var("SMOLTABLE_PORT"))
+        .or_else(|_| std::env::var("PORT"))
         .unwrap_or("9876".into());
 
     port.parse::<u16>().expect("invalid port")
@@ -21,4 +22,11 @@ pub fn metrics_cap_mb() -> u16 {
 
     port.parse::<u16>()
         .expect("invalid metrics cap MB setting, can be up to 65536")
+}
+
+/// Global write buffer size
+pub fn write_buffer_size() -> u32 {
+    let port = std::env::var("SMOLTABLE_WRITE_BUFFER_SIZE").unwrap_or("67108864".into());
+
+    port.parse::<u32>().expect("invalid metrics cap MB setting")
 }

@@ -20,7 +20,6 @@ pub struct ColumnOptions {
 
 /* #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CellOptions {
-    // TODO: limit versions per cell
     // pub time: Option<Range>, // TODO:
 } */
 

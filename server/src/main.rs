@@ -7,7 +7,7 @@ mod manifest;
 mod metrics;
 mod response;
 
-use crate::env::{data_folder, get_port};
+use crate::env::{data_folder, get_port, write_buffer_size};
 use actix_web::{
     http::header::ContentType, middleware::Logger, web, App, HttpResponse, HttpServer,
 };
@@ -284,13 +284,13 @@ async fn catch_all(data: web::Data<AppState>) -> CustomRouteResult<HttpResponse>
 async fn main() -> smoltable::Result<()> {
     env_logger::Builder::from_default_env().init();
 
-    eprint!("\n");
+    eprintln!();
     eprintln!("                    | | |      | |   | |     ");
     eprintln!("  ___ _ __ ___   ___ | | |_ __ _| |__ | | ___ ");
     eprintln!(" / __| '_ ` _ \\ / _ \\| | __/ _` | '_ \\| |/ _ \\");
     eprintln!(" \\__ \\ | | | | | (_) | | || (_| | |_) | |  __/");
     eprintln!(" |___/_| |_| |_|\\___/|_|\\__\\__,_|_.__/|_|\\___|");
-    eprint!("\n");
+    eprintln!();
 
     log::info!("smoltable server {}", env!("CARGO_PKG_VERSION"));
     let port = get_port();
@@ -304,7 +304,7 @@ async fn main() -> smoltable::Result<()> {
 
     let keyspace = fjall::Config::new(data_folder())
         .block_cache(block_cache.clone())
-        // TODO: write buffer setting
+        .max_write_buffer_size(u64::from(write_buffer_size()))
         .open()?;
 
     let manifest_table = ManifestTable::open(keyspace.clone())?;

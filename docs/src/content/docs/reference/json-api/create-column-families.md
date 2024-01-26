@@ -71,8 +71,3 @@ Maximum amount of versions to keep per cell. Oldest versions are deleted first.
 ##### `gc_settings.ttl_secs`
 
 Time-to-live in seconds per cell.
-
-:::caution
-Garbage collection happens asynchronously and lazily, so data may live longer than the defined
-limits.
-:::

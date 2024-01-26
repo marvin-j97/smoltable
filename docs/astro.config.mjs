@@ -28,6 +28,7 @@ export default defineConfig({
 					label: 'Reference',
 					autogenerate: { directory: 'reference' },
 					items: [
+						{ label: 'Environment variables', link: '/reference/env' },
 						{
 							label: "JSON API",
 							items: [

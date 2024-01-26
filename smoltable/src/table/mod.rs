@@ -417,6 +417,8 @@ impl Smoltable {
                     if version_limit > 0 && cell_count_in_column > version_limit {
                         reader.partition.remove(&cell.raw_key)?;
                         deleted_cell_count += 1;
+
+                        continue;
                     }
                 }
 
