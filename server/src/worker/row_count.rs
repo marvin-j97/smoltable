@@ -15,6 +15,8 @@ pub async fn start(tables: Arc<RwLock<HashMap<String, MonitoredSmoltable>>>) {
             for (table_name, table) in tables {
                 log::debug!("Counting {table_name}");
 
+                // TODO: maybe allow approximate count instead, using env var
+
                 if let Ok((row_count, cell_count)) = table.count() {
                     TableWriter::write_batch(
                         table.metrics.clone(),

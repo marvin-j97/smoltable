@@ -169,6 +169,17 @@ impl Smoltable {
             .unwrap_or_else(|| self.tree.clone()))
     }
 
+    pub fn column_family_count(&self) -> crate::Result<usize> {
+        let mut count = 0;
+
+        for item in self.manifest.prefix("cf#").into_iter() {
+            let _ = item?;
+            count += 1;
+        }
+
+        Ok(count)
+    }
+
     pub fn list_column_families(&self) -> crate::Result<Vec<ColumnFamilyDefinition>> {
         let items = self
             .manifest
@@ -287,7 +298,23 @@ impl Smoltable {
         Ok(())
     }
 
+    pub fn approximate_cell_count(&self) -> crate::Result<u64> {
+        let locality_groups = get_affected_locality_groups(self, &None)?;
+
+        Ok(locality_groups
+            .into_iter()
+            .map(|lg| lg.approximate_len())
+            .sum())
+    }
+
     // TODO: count thrashes block cache
+
+    pub fn approximate_count(&self) -> crate::Result<(usize, usize)> {
+        let cell_count = self.approximate_cell_count()? as usize;
+        let cf_count = self.column_family_count()?;
+        let row_count = cell_count / cf_count;
+        Ok((row_count, cell_count))
+    }
 
     // TODO: unit test
     pub fn count(&self) -> crate::Result<(usize, usize)> {
@@ -304,7 +331,7 @@ impl Smoltable {
 
         let readers = locality_groups_to_scan
             .into_iter()
-            .map(|x| TableReader::new(instant, x, std::ops::Bound::Unbounded).chunk_size(64_000))
+            .map(|x| TableReader::new(instant, x, std::ops::Bound::Unbounded))
             .collect::<Vec<_>>();
 
         let mut current_row_key = None;
@@ -371,7 +398,7 @@ impl Smoltable {
 
         let mut readers = locality_groups_to_scan
             .into_iter()
-            .map(|x| TableReader::new(instant, x, std::ops::Bound::Unbounded).chunk_size(64_000))
+            .map(|x| TableReader::new(instant, x, std::ops::Bound::Unbounded))
             .collect::<Vec<_>>();
 
         let mut current_row_key = None;
@@ -381,6 +408,11 @@ impl Smoltable {
         // IMPORTANT: Can't use MergeReader because we may need to access
         // a specific partition (locality group)
         for mut reader in &mut readers {
+            log::trace!(
+                "[gc worker] scanning over partition {:?}",
+                reader.partition.name
+            );
+
             loop {
                 let Some(cell) = reader.next() else {
                     break;

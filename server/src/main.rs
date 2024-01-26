@@ -23,6 +23,7 @@ use tokio::sync::RwLock;
 
 fn print_banner() {
     eprintln!();
+    eprintln!("                      _ _        _     _");
     eprintln!("                     | | |      | |   | |     ");
     eprintln!("  ___ _ __ ___   ___ | | |_ __ _| |__ | | ___ ");
     eprintln!(" / __| '_ ` _ \\ / _ \\| | __/ _` | '_ \\| |/ _ \\");
