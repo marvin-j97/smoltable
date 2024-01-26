@@ -49,7 +49,7 @@ async fn main() -> smoltable::Result<()> {
 
     let keyspace = fjall::Config::new(data_folder())
         .block_cache(block_cache.clone())
-        .max_write_buffer_size(u64::from(write_buffer_size()))
+        .max_write_buffer_size(u64::from(write_buffer_size()) * 1_024 * 1_024)
         .open()?;
 
     let manifest_table = ManifestTable::open(keyspace.clone())?;
@@ -119,9 +119,15 @@ async fn main() -> smoltable::Result<()> {
             .allowed_header("*")
             .max_age(3600);
 
+        // custom `Json` extractor configuration
+        let json_cfg = web::JsonConfig::default()
+            // limit request payload size
+            .limit(10 * 1_024 * 1_024);
+
         App::new()
             .wrap(cors)
             .wrap(Logger::new("%r %s - %{User-Agent}i"))
+            .app_data(json_cfg)
             .app_data(app_state.clone())
             .route("/", web::get().to(render_dashboard))
             .route("/index.html", web::get().to(render_dashboard))

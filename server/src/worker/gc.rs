@@ -31,7 +31,9 @@ pub async fn start(tables: Arc<RwLock<HashMap<String, MonitoredSmoltable>>>) {
                     }
                 };
             }
-        });
+        })
+        .await
+        .expect("should join");
 
         log::info!("TTL worker done");
         tokio::time::sleep(Duration::from_secs(/* 24 hours*/ 21_600 * 4)).await;

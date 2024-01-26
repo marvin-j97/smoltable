@@ -23,7 +23,7 @@ HTTP port to listen to.
 
 *Default: 9876*
 
-##### `SMOLTABLE_WRITE_BUFFER_SIZE`
+##### `SMOLTABLE_WRITE_BUFFER_SIZE_MB`
 
 Global write buffer size, shared by all tables, locality groups, metrics tables and internal tables.
 

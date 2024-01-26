@@ -25,8 +25,8 @@ pub fn metrics_cap_mb() -> u16 {
 }
 
 /// Global write buffer size
-pub fn write_buffer_size() -> u32 {
-    let port = std::env::var("SMOLTABLE_WRITE_BUFFER_SIZE").unwrap_or("67108864".into());
+pub fn write_buffer_size() -> u16 {
+    let port = std::env::var("SMOLTABLE_WRITE_BUFFER_SIZE_MB").unwrap_or("64".into());
 
-    port.parse::<u32>().expect("invalid metrics cap MB setting")
+    port.parse::<u16>().expect("invalid metrics cap MB setting")
 }
