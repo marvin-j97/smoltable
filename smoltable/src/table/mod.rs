@@ -7,7 +7,8 @@ use self::row_reader::SingleRowReader;
 use crate::{
     query::{
         row::{
-            Input as QueryRowInput, Output as QueryRowOutput, RowOptions as QueryRowInputRowOptions,
+            ColumnOptions as QueryRowColumnOptions, Input as QueryRowInput,
+            Output as QueryRowOutput, RowOptions as QueryRowInputRowOptions,
         },
         scan::{Input as QueryPrefixInput, Output as QueryPrefixOutput, ScanMode},
     },
@@ -444,7 +445,11 @@ impl Smoltable {
     // TODO: delete row thrashes block cache
 
     // TODO: allow deleting specific columns -> DeleteRowInput, also batch + limit it?
-    pub fn delete_row(&self, row_key: String) -> crate::Result<u64> {
+    pub fn delete_row(
+        &self,
+        row_key: String,
+        column_filter: Option<ColumnFilter>,
+    ) -> crate::Result<u64> {
         let mut count = 0;
 
         let mut reader = SingleRowReader::new(
@@ -455,7 +460,10 @@ impl Smoltable {
                     key: row_key,
                     cell_limit: None,
                 },
-                column: None,
+                column: column_filter.map(|cf| QueryRowColumnOptions {
+                    cell_limit: None,
+                    filter: Some(cf),
+                }),
             },
         )?;
 

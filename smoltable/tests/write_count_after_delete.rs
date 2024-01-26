@@ -55,19 +55,19 @@ pub fn write_count_after_delete() -> smoltable::Result<()> {
     assert_eq!(2, row_count);
     assert_eq!(4, cell_count);
 
-    table.delete_row("test".to_string())?;
+    table.delete_row("test".to_string(), None)?;
 
     let (row_count, cell_count) = table.count()?;
     assert_eq!(1, row_count);
     assert_eq!(2, cell_count);
 
-    table.delete_row("test".to_string())?;
+    table.delete_row("test".to_string(), None)?;
 
     let (row_count, cell_count) = table.count()?;
     assert_eq!(1, row_count);
     assert_eq!(2, cell_count);
 
-    table.delete_row("test2".to_string())?;
+    table.delete_row("test2".to_string(), None)?;
 
     let (row_count, cell_count) = table.count()?;
     assert_eq!(0, row_count);

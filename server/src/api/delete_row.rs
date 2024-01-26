@@ -11,12 +11,12 @@ use actix_web::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use smoltable::TableWriter;
+use smoltable::{ColumnFilter, TableWriter};
 
 #[derive(Debug, Deserialize)]
 pub struct Input {
     row_key: String,
-    // column_filter: Option<ColumnKey>,
+    column_filter: Option<ColumnFilter>,
 }
 
 // TODO: change input format to Vec, atomic multi-row deletes...?
@@ -51,13 +51,17 @@ pub async fn handler(
         ));
     }
 
+    let req_body = req_body.into_inner();
+
     if let Some(table) = tables.get(&table_name) {
         let count = {
             let table = table.clone();
 
-            tokio::task::spawn_blocking(move || table.delete_row(req_body.row_key.clone()))
-                .await
-                .expect("should join")
+            tokio::task::spawn_blocking(move || {
+                table.delete_row(req_body.row_key, req_body.column_filter)
+            })
+            .await
+            .expect("should join")
         }?;
 
         let micros_total = before.elapsed().as_micros();
