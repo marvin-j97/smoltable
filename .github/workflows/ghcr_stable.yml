@@ -19,12 +19,12 @@ jobs:
           password: ${{ secrets.REGISTRY_TOKEN }}
       - name: Build and push Docker image
         run: |
-          docker build . -f Dockerfile.alpine -t ${{ github.repository }}:alpine
-          docker build . -f Dockerfile.debian -t ${{ github.repository }}:debian
-          docker tag ${{ github.repository }}:alpine ghcr.io/${{ github.repository }}:alpine
-          docker tag ${{ github.repository }}:debian ghcr.io/${{ github.repository }}:debian
-          docker tag ${{ github.repository }}:alpine ghcr.io/${{ github.repository }}:${{ github.ref_name }}-alpine
-          docker tag ${{ github.repository }}:debian ghcr.io/${{ github.repository }}:${{ github.ref_name }}-debian
+          docker build . -f Dockerfile.alpine -t smoltable:alpine
+          docker build . -f Dockerfile.debian -t smoltable:debian
+          docker tag smoltable:alpine ghcr.io/${{ github.repository }}:alpine
+          docker tag smoltable:debian ghcr.io/${{ github.repository }}:debian
+          docker tag smoltable:alpine ghcr.io/${{ github.repository }}:${{ github.ref_name }}-alpine
+          docker tag smoltable:debian ghcr.io/${{ github.repository }}:${{ github.ref_name }}-debian
           docker push ghcr.io/${{ github.repository }}:alpine
           docker push ghcr.io/${{ github.repository }}:debian
           docker push ghcr.io/${{ github.repository }}:${{ github.ref_name }}-alpine
