@@ -21,7 +21,7 @@ jobs:
         run: |
           docker build . -f Dockerfile.alpine -t smoltable:edge-alpine
           docker build . -f Dockerfile.debian -t smoltable:edge-debian
-          docker tag smoltable:alpine ghcr.io/${{ github.repository }}:${{ github.ref_name }}-alpine
-          docker tag smoltable:debian ghcr.io/${{ github.repository }}:${{ github.ref_name }}-debian
+          docker tag smoltable:edge-alpine ghcr.io/${{ github.repository }}:edge-alpine
+          docker tag smoltable:edge-debian ghcr.io/${{ github.repository }}:edge-debian
           docker push ghcr.io/${{ github.repository }}:edge-alpine
           docker push ghcr.io/${{ github.repository }}:edge-debian
