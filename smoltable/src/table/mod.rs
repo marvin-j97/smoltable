@@ -660,7 +660,7 @@ impl Smoltable {
         })
     }
 
-    fn column_families_that_are_in_default_locality_group(&self) -> crate::Result<Vec<String>> {
+    fn column_families_in_default_locality_group(&self) -> crate::Result<Vec<String>> {
         let mut fams = self
             .list_column_families()?
             .into_iter()

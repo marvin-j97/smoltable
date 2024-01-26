@@ -17,7 +17,7 @@ pub fn get_affected_locality_groups(
                 let column_family_name = &key.family;
 
                 if table
-                    .column_families_that_are_in_default_locality_group()?
+                    .column_families_in_default_locality_group()?
                     .contains(column_family_name)
                 {
                     locality_groups.push(table.tree.clone());
@@ -42,12 +42,11 @@ pub fn get_affected_locality_groups(
                     .map(|lg| lg.tree.clone());
 
                 {
-                    let column_families_that_are_in_default_locality_group =
-                        table.column_families_that_are_in_default_locality_group()?;
+                    let column_families_in_default_locality_group =
+                        table.column_families_in_default_locality_group()?;
 
                     if column_family_names.iter().any(|column_family_name| {
-                        column_families_that_are_in_default_locality_group
-                            .contains(column_family_name)
+                        column_families_in_default_locality_group.contains(column_family_name)
                     }) {
                         locality_groups.push(table.tree.clone());
                     }
