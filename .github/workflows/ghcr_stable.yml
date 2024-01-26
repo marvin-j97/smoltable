@@ -21,9 +21,11 @@ jobs:
         run: |
           docker build . -f Dockerfile.alpine -t ${{ github.repository }}:alpine
           docker build . -f Dockerfile.debian -t ${{ github.repository }}:debian
-          docker tag ${{ github.repository }}:alpine ${{ github.repository }}:${{ github.ref_name }}-alpine
-          docker tag ${{ github.repository }}:debian ${{ github.repository }}:${{ github.ref_name }}-debian
-          docker push ${{ github.repository }}:alpine
-          docker push ${{ github.repository }}:debian
-          docker push ${{ github.repository }}:${{ github.ref_name }}-alpine
-          docker push ${{ github.repository }}:${{ github.ref_name }}-debian
+          docker tag ${{ github.repository }}:alpine ghcr.io/${{ github.repository }}:alpine
+          docker tag ${{ github.repository }}:debian ghcr.io/${{ github.repository }}:debian
+          docker tag ${{ github.repository }}:alpine ghcr.io/${{ github.repository }}:${{ github.ref_name }}-alpine
+          docker tag ${{ github.repository }}:debian ghcr.io/${{ github.repository }}:${{ github.ref_name }}-debian
+          docker push ghcr.io/${{ github.repository }}:alpine
+          docker push ghcr.io/${{ github.repository }}:debian
+          docker push ghcr.io/${{ github.repository }}:${{ github.ref_name }}-alpine
+          docker push ghcr.io/${{ github.repository }}:${{ github.ref_name }}-debian
