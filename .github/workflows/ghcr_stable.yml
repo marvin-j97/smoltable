@@ -1,0 +1,29 @@
+name: Deploy Docker (latest)
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  Deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+      - name: Build and push Docker image
+        run: |
+          docker build . -f Dockerfile.alpine -t ${{ github.repository }}:alpine
+          docker build . -f Dockerfile.debian -t ${{ github.repository }}:debian
+          docker tag ${{ github.repository }}:alpine ${{ github.repository }}:${{ github.ref_name }}-alpine
+          docker tag ${{ github.repository }}:debian ${{ github.repository }}:${{ github.ref_name }}-debian
+          docker push ${{ github.repository }}:alpine
+          docker push ${{ github.repository }}:debian
+          docker push ${{ github.repository }}:${{ github.ref_name }}-alpine
+          docker push ${{ github.repository }}:${{ github.ref_name }}-debian
