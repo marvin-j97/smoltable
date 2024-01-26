@@ -285,7 +285,7 @@ async fn main() -> smoltable::Result<()> {
     env_logger::Builder::from_default_env().init();
 
     eprintln!();
-    eprintln!("                    | | |      | |   | |     ");
+    eprintln!("                     | | |      | |   | |     ");
     eprintln!("  ___ _ __ ___   ___ | | |_ __ _| |__ | | ___ ");
     eprintln!(" / __| '_ ` _ \\ / _ \\| | __/ _` | '_ \\| |/ _ \\");
     eprintln!(" \\__ \\ | | | | | (_) | | || (_| | |_) | |  __/");

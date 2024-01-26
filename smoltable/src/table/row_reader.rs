@@ -93,6 +93,10 @@ impl SingleRowReader {
         })
     }
 
+    pub fn locality_group_count(&self) -> usize {
+        self.locality_groups.len()
+    }
+
     pub fn cells_scanned_count(&self) -> u64 {
         self.cells_scanned_count
             + self

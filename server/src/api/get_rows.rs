@@ -76,13 +76,12 @@ pub async fn handler(
         )
         .ok();
 
-        /* TODO: affected_locality_groups */
-
         Ok(build_response(
             dur,
             StatusCode::OK,
             "Query successful",
             &json!({
+                "affected_locality_groups": result.affected_locality_groups,
                 "micros": micros_total,
                 "micros_per_row": micros_per_row,
                 "rows_scanned": result.rows_scanned_count,

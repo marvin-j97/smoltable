@@ -78,19 +78,10 @@ impl std::ops::Deref for Smoltable {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Default, Debug, Deserialize, Serialize)]
 pub struct GarbageCollectionOptions {
     pub version_limit: Option<u64>,
     pub ttl_secs: Option<u64>,
-}
-
-impl Default for GarbageCollectionOptions {
-    fn default() -> Self {
-        Self {
-            ttl_secs: None,
-            version_limit: None,
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -485,9 +476,13 @@ impl Smoltable {
 
         let mut rows = Vec::with_capacity(inputs.len());
 
+        let mut affected_locality_groups = 0;
+
         for input in inputs {
             let query_result = self.get_row(input)?;
             rows.extend(query_result.row);
+
+            affected_locality_groups += query_result.affected_locality_groups;
             cells_scanned_count += query_result.cells_scanned_count;
             bytes_scanned_count += query_result.bytes_scanned_count;
             rows_scanned_count += 1;
@@ -495,6 +490,7 @@ impl Smoltable {
 
         Ok(QueryPrefixOutput {
             rows,
+            affected_locality_groups,
             rows_scanned_count,
             cells_scanned_count,
             bytes_scanned_count,
@@ -534,6 +530,8 @@ impl Smoltable {
         let mut row_sample_counter = 1.0_f32;
 
         let mut rows: BTreeMap<String, Row> = BTreeMap::new();
+
+        let affected_locality_groups = locality_groups_to_scan.len();
 
         let readers = locality_groups_to_scan
             .into_iter()
@@ -654,6 +652,7 @@ impl Smoltable {
 
         Ok(QueryPrefixOutput {
             rows: rows.into_values().collect(),
+            affected_locality_groups,
             cells_scanned_count,
             rows_scanned_count,
             bytes_scanned_count,
@@ -734,6 +733,7 @@ impl Smoltable {
 
         Ok(QueryRowOutput {
             row,
+            affected_locality_groups: reader.locality_group_count(),
             cells_scanned_count: reader.cells_scanned_count(),
             bytes_scanned_count: reader.bytes_scanned_count(),
         })

@@ -32,6 +32,7 @@ pub struct Input {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Output {
+    pub affected_locality_groups: usize,
     pub row: Option<Row>,
     pub cells_scanned_count: u64,
     pub bytes_scanned_count: u64,

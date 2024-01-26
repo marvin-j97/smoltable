@@ -57,6 +57,7 @@ pub struct Input {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Output {
     pub rows: Vec<Row>,
+    pub affected_locality_groups: usize,
     pub cells_scanned_count: u64,
     pub rows_scanned_count: u64,
     pub bytes_scanned_count: u64,

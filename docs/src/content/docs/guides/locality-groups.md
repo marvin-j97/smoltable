@@ -160,7 +160,8 @@ curl --request POST \
 
 ### Query data
 
-Let's query our entire table using a scan with empty prefix:
+Let's query our entire table using a scan with empty prefix, but
+only return the column `title:`:
 
 ```bash
 curl --request POST \
@@ -182,7 +183,7 @@ Smoltable returns (again, body truncated for brevity):
 {
   "message": "Query successful",
   "result": {
-    "affected_locality_groups": 1, // TODO:
+    "affected_locality_groups": 2,
     "bytes_scanned": 1141,
     "cell_count": 8,
     "cells_scanned": 16,
@@ -212,7 +213,7 @@ Smoltable returns (again, body truncated for brevity):
 }
 ```
 
-Note, how we scanned 1 KB of data, and 16 cells, but only returned 8 cells (because we filtered by the `title` column family). That means we have a read amplification of `2`.
+Note, how we scanned 1 KB of data, and 16 cells, but only returned 8 cells (because we filtered by the `title` column family). That means we have a read amplification of about `2`.
 
 ## Example: With locality groups
 
@@ -341,6 +342,7 @@ which returns (truncated):
 {
   "message": "Query successful",
   "result": {
+    "affected_locality_groups": 1,
     "bytes_scanned": 681,
     "cell_count": 8,
     "cells_scanned": 8,
@@ -410,6 +412,7 @@ curl --request POST \
 {
   "message": "Query successful",
   "result": {
+    "affected_locality_groups": 2,
     "bytes_scanned": 1141,
     "cell_count": 8,
     "cells_scanned": 16,
@@ -431,6 +434,7 @@ curl --request POST \
 {
   "message": "Query successful",
   "result": {
+    "affected_locality_groups": 1,
     "bytes_scanned": 460,
     "cell_count": 8,
     "cells_scanned": 8,
