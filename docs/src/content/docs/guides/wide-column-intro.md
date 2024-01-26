@@ -186,4 +186,4 @@ This is a summary based on parts of Bigtable's documentation that apply to Smolt
   - Store multiple delimited values in each row key
   - Keep your row keys short
 - Pad integers with leading zeroes: important for timestamps where range-based queries are used
-- Do not use Sequential numeric IDs as row key
+- Do not use sequential numeric IDs as row key

@@ -330,9 +330,10 @@ impl Smoltable {
 
     // TODO: GC thrashes block cache
 
-    // TODO: unit test
     pub fn run_version_gc(&self) -> crate::Result<u64> {
         use reader::Reader as TableReader;
+
+        log::trace!("Running GC on {:?}", self.name);
 
         let gc_options_map = self
             .list_column_families()?
