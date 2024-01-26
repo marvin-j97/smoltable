@@ -64,6 +64,8 @@ pub fn read_row_harder() -> smoltable::Result<()> {
         },
     })?;
 
+    assert_eq!(query_result.affected_locality_groups, 1);
+
     assert_eq!(
         serde_json::to_value(query_result.row).unwrap(),
         serde_json::json!({

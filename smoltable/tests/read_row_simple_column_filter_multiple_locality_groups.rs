@@ -63,6 +63,7 @@ pub fn read_row_simple_column_filter_multiple_locality_groups() -> smoltable::Re
         },
     })?;
 
+    assert_eq!(query_result.affected_locality_groups, 1);
     assert_eq!(query_result.cells_scanned_count, 1);
 
     assert_eq!(
@@ -96,6 +97,7 @@ pub fn read_row_simple_column_filter_multiple_locality_groups() -> smoltable::Re
         },
     })?;
 
+    assert_eq!(query_result.affected_locality_groups, 1);
     assert_eq!(query_result.cells_scanned_count, 1);
 
     assert_eq!(

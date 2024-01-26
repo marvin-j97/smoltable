@@ -119,6 +119,8 @@ pub fn gc_ttl() -> smoltable::Result<()> {
             cell_limit: None,
         },
     })?;
+
+    assert_eq!(query_result.affected_locality_groups, 1);
     assert_eq!(query_result.cells_scanned_count, 6);
 
     table.run_version_gc()?;
@@ -130,6 +132,8 @@ pub fn gc_ttl() -> smoltable::Result<()> {
             cell_limit: None,
         },
     })?;
+
+    assert_eq!(query_result.affected_locality_groups, 1);
     assert_eq!(query_result.cells_scanned_count, 1);
 
     Ok(())

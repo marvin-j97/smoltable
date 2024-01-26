@@ -50,6 +50,7 @@ pub fn read_row_column_cell_limit() -> smoltable::Result<()> {
         },
     })?;
 
+    assert_eq!(query_result.affected_locality_groups, 1);
     assert_eq!(query_result.cells_scanned_count, 2);
 
     assert_eq!(
@@ -135,6 +136,7 @@ pub fn write_read_row_multiple_columns_cell_limit() -> smoltable::Result<()> {
         },
     })?;
 
+    assert_eq!(query_result.affected_locality_groups, 1);
     assert_eq!(query_result.cells_scanned_count, 10);
 
     assert_eq!(

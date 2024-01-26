@@ -78,6 +78,7 @@ pub fn scan_prefix_simple() -> smoltable::Result<()> {
         },
     })?;
 
+    assert_eq!(query_result.affected_locality_groups, 1);
     assert_eq!(query_result.cells_scanned_count, 4);
 
     assert_eq!(

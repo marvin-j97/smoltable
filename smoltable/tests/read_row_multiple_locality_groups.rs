@@ -57,6 +57,7 @@ pub fn read_row_multiple_locality_groups() -> smoltable::Result<()> {
         },
     })?;
 
+    assert_eq!(query_result.affected_locality_groups, 2);
     assert_eq!(query_result.cells_scanned_count, 2);
 
     assert_eq!(

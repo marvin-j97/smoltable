@@ -82,6 +82,7 @@ pub fn scan_range_simple() -> smoltable::Result<()> {
         },
     })?;
 
+    assert_eq!(query_result.affected_locality_groups, 1);
     assert_eq!(query_result.cells_scanned_count, 2);
 
     assert_eq!(

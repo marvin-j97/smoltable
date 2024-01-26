@@ -82,6 +82,7 @@ pub fn read_row_multi_column_filter_multiple_locality_groups() -> smoltable::Res
         },
     })?;
 
+    assert_eq!(query_result.affected_locality_groups, 1);
     assert_eq!(query_result.cells_scanned_count, 1);
 
     assert_eq!(
@@ -106,7 +107,9 @@ pub fn read_row_multi_column_filter_multiple_locality_groups() -> smoltable::Res
     let query_result = table.get_row(QueryRowInput {
         // cell: None,
         column: Some(QueryRowInputColumnOptions {
-            filter: Some(ColumnFilter::Key(ColumnKey::try_from("another:").unwrap())),
+            filter: Some(ColumnFilter::Multi(vec![
+                ColumnKey::try_from("another:").unwrap()
+            ])),
             cell_limit: None,
         }),
         row: QueryRowInputRowOptions {
@@ -115,6 +118,7 @@ pub fn read_row_multi_column_filter_multiple_locality_groups() -> smoltable::Res
         },
     })?;
 
+    assert_eq!(query_result.affected_locality_groups, 1);
     assert_eq!(query_result.cells_scanned_count, 1);
 
     assert_eq!(

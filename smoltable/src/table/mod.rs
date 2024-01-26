@@ -694,6 +694,7 @@ impl Smoltable {
         let mut columns: HashMap<String, HashMap<String, Vec<Cell>>> = HashMap::new();
 
         let mut reader = SingleRowReader::new(self, self.keyspace.instant(), input)?;
+        let locality_group_count = reader.locality_group_count();
 
         let mut cell_count = 0; // Cell count over all aggregated columns
 
@@ -734,7 +735,7 @@ impl Smoltable {
 
         Ok(QueryRowOutput {
             row,
-            affected_locality_groups: reader.locality_group_count(),
+            affected_locality_groups: locality_group_count,
             cells_scanned_count: reader.cells_scanned_count(),
             bytes_scanned_count: reader.bytes_scanned_count(),
         })
