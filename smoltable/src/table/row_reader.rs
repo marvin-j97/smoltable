@@ -162,6 +162,10 @@ impl Iterator for &mut SingleRowReader {
                         Err(e) => return Some(Err(e)),
                     };
 
+                    if cell.row_key != self.input.row.key {
+                        return None;
+                    }
+
                     let column_filter = self.input.column.as_ref().and_then(|x| x.filter.as_ref());
 
                     if let Some(filter) = column_filter {
