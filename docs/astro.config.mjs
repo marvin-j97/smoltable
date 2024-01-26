@@ -15,10 +15,15 @@ export default defineConfig({
 			},
 			sidebar: [
 				{
-					label: 'Guides',
+					label: 'Getting started',
 					items: [
 						{ label: 'What is Smoltable?', link: '/' },
-						{ label: 'Installation', link: '/guides/installation/' },
+						{ label: 'Installation', link: '/guides/installation/' }
+					],
+				},
+				{
+					label: 'Guides',
+					items: [
 						{ label: 'Wide-column data design', link: '/guides/wide-column-intro/' },
 						{ label: 'Column keys', link: '/guides/column-keys' },
 						{ label: 'Locality groups', link: '/guides/locality-groups' },
