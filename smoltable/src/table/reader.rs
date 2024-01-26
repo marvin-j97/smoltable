@@ -91,13 +91,18 @@ impl Reader {
                 .take(self.chunk_size)
                 .collect::<Result<Vec<_>, fjall::LsmError>>();
 
-            self.chunk_size = (self.chunk_size * 2).min(64_000);
-
             // Advance range by querying chunks
             match collected {
                 Ok(chunk) => {
                     if chunk.is_empty() {
                         return None;
+                    }
+
+                    let chunk_memory = chunk.iter().map(|(k, v)| k.len() + v.len()).sum::<usize>();
+
+                    // TODO: ~20 mb for now
+                    if chunk_memory <= 10_000_000 {
+                        self.chunk_size = (self.chunk_size * 2).min(128_000);
                     }
 
                     self.cells_scanned_count += chunk.len() as u64;
