@@ -114,7 +114,7 @@ All data is stored in the `_dat_scan-example` partition.
 
 Let's ingest some data and query it (body is truncated for brevity):
 
-```json
+```bash
 curl --request POST \
   --url http://localhost:9876/v1/table/scan-example/write \
   --header 'content-type: application/json' \
@@ -372,7 +372,7 @@ which returns (truncated):
 }
 ```
 
-We get the exact same result, however, we reduce scanned bytes down to 680 bytes, and halved scanned cells, and achieved a read amplification of `1`!
+We get the exact same result, however, we reduced scanned bytes down to 680 bytes, and halved scanned cells, achieving a read amplification of `1`!
 
 ## Example: Scanning another column family
 
