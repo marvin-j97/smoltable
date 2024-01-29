@@ -61,7 +61,7 @@ restructure our data:
 | row key | flight\:FI318 | flight\:FI319 | flight\:EW7033 | flight\:EW7036 | meta\:miles | meta\:model | meta\:operator |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | plane#TF-FIR | 2024-01-25 | 2024-01-25 |  |  | 51000000 | Boeing 757-256 | Icelandair |
-| plane#plane#D-AIQN |  |  | 2019-10-31 | 2019-10-31 | 52142142 | Airbus A320-211 | Germanwings |
+| plane#D-AIQN |  |  | 2019-10-31 | 2019-10-31 | 52142142 | Airbus A320-211 | Germanwings |
 
 We can easily store all data in a single row, using two column families, `flight` and `meta`. Meta contains arbitrary columns
 of different kind of metadata, while each column inside `flights` is a flight number, with the cell value being the flight data.
