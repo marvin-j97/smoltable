@@ -17,5 +17,5 @@ Column qualifiers in Bigtable can be arbitrary byte arrays. In Smoltable, they n
 ## Default column
 
 The column qualifier can be omitted to access the default column (empty). For instance,
-we wanted to have a single column family that stores a title, the column would be accessed
+if we wanted to have a single column family that stores a title, the column would be accessed
 by `title:`. In that case, the `:` can be omitted: `title`.
