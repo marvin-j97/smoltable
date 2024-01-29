@@ -144,7 +144,7 @@ restructure our data:</p>
 
 
 
-<table><thead><tr><th>row key</th><th>flight:FI318</th><th>flight:FI319</th><th>flight:EW7033</th><th>flight:EW7036</th><th>meta:miles</th><th>meta:model</th><th>meta:operator</th></tr></thead><tbody><tr><td>plane#TF-FIR</td><td>2024-01-25</td><td>2024-01-25</td><td></td><td></td><td>51000000</td><td>Boeing 757-256</td><td>Icelandair</td></tr><tr><td>plane#plane#D-AIQN</td><td></td><td></td><td>2019-10-31</td><td>2019-10-31</td><td>52142142</td><td>Airbus A320-211</td><td>Germanwings</td></tr></tbody></table>
+<table><thead><tr><th>row key</th><th>flight:FI318</th><th>flight:FI319</th><th>flight:EW7033</th><th>flight:EW7036</th><th>meta:miles</th><th>meta:model</th><th>meta:operator</th></tr></thead><tbody><tr><td>plane#TF-FIR</td><td>2024-01-25</td><td>2024-01-25</td><td></td><td></td><td>51000000</td><td>Boeing 757-256</td><td>Icelandair</td></tr><tr><td>plane#D-AIQN</td><td></td><td></td><td>2019-10-31</td><td>2019-10-31</td><td>52142142</td><td>Airbus A320-211</td><td>Germanwings</td></tr></tbody></table>
 <p>We can easily store all data in a single row, using two column families, <code dir="auto">flight</code> and <code dir="auto">meta</code>. Meta contains arbitrary columns
 of different kind of metadata, while each column inside <code dir="auto">flights</code> is a flight number, with the cell value being the flight data.
 Remember, unused columns do not account into space usage. To retrieve data, we can a specific column and use a column filter.</p>
