@@ -15,9 +15,8 @@ pub async fn start(tables: Arc<RwLock<HashMap<String, MonitoredSmoltable>>>) {
             for (table_name, table) in tables {
                 log::debug!("Counting {table_name}");
 
-                // TODO: maybe allow approximate count instead, using env var
-
-                if let Ok((row_count, cell_count)) = table.count() {
+                // TODO: maybe allow precise count instead, using env var
+                if let Ok((row_count, cell_count)) = table.approximate_count() {
                     TableWriter::write_batch(
                         table.metrics.clone(),
                         &[
@@ -39,6 +38,7 @@ pub async fn start(tables: Arc<RwLock<HashMap<String, MonitoredSmoltable>>>) {
         log::info!("Counting worker done in {time_s}s");
 
         let sleep_time = match time_s {
+            _ if time_s < 2 => 30,
             _ if time_s < 5 => 60,
             _ if time_s < 60 => 3_600,
             _ => 21_600, // 6 hours
