@@ -3,7 +3,7 @@ title: Wide-column design
 description: An intro to wide-column databases
 ---
 
-Like Bigtable, Smoltable is a wide-column [1] database. It could be described as a *sparse, persistent multi-dimensional sorted map*. Every table is sorted by the *row key*, which is a unique identifier for each row. There are no secondary indexes. This may seem limiting but surprisingly many access patterns can be modelled this way.
+Like Bigtable, Smoltable is a wide-column [1] database. It could be described as a _sparse, persistent multi-dimensional sorted map_. Every table is sorted by the _row key_, which is a unique identifier for each row. There are no secondary indexes. This may seem limiting but surprisingly many access patterns can be modelled this way.
 
 The row key is not necessarily the same as the primary key in a relational database: A row in general is not a fixed structure like in a relational database. Each row may contain arbitrarily many columns, grouped into column families. Column families must be defined upfront, but column qualifiers (column names) can be defined dynamically, and do not need to adhere to a fixed schema. Because the table is sparse, unused columns do not cost any disk space. Retrieving specific columns does not require retrieving the entire row.
 
@@ -26,7 +26,7 @@ which maps to some value, the `cell value`. The cell value, unlike in Bigtable, 
 The timestamp allows storing multiple versions of the same cell.
 
 :::note
-  If versioning is not intended for a specific column, the timestamp `0` should be used.
+If versioning is not intended for a specific column, the timestamp `0` should be used.
 :::
 
 ## Columns as data
@@ -34,18 +34,18 @@ The timestamp allows storing multiple versions of the same cell.
 Consider this scenario: We want to store a fleet of aircrafts, each having a list of flights and
 some metadata. One possible naive implementation would be:
 
-| row key | value: |
-| --- | --- |
-| plane#TF-FIR#flight#FI318 | 2024-01-25 |
-| plane#TF-FIR#flight#FI319 | 2024-01-25 |
-| plane#TF-FIR#meta#miles | 51000000 |
-| plane#TF-FIR#meta#model | Boeing 757-256 |
-| plane#TF-FIR#meta#operator | Icelandair |
-| plane#D-AIQN#flight#EW7033 | 2019-10-31 |
-| plane#D-AIQN#flight#EW7036 | 2019-10-31 |
-| plane#D-AIQN#meta#miles | 52142142 |
-| plane#D-AIQN#meta#model | Airbus A320-211 |
-| plane#D-AIQN#meta#operator | Germanwings |
+| row key                    | value:          |
+| -------------------------- | --------------- |
+| plane#TF-FIR#flight#FI318  | 2024-01-25      |
+| plane#TF-FIR#flight#FI319  | 2024-01-25      |
+| plane#TF-FIR#meta#miles    | 51000000        |
+| plane#TF-FIR#meta#model    | Boeing 757-256  |
+| plane#TF-FIR#meta#operator | Icelandair      |
+| plane#D-AIQN#flight#EW7033 | 2019-10-31      |
+| plane#D-AIQN#flight#EW7036 | 2019-10-31      |
+| plane#D-AIQN#meta#miles    | 52142142        |
+| plane#D-AIQN#meta#model    | Airbus A320-211 |
+| plane#D-AIQN#meta#operator | Germanwings     |
 
 For every attribute, a composite row key is used, and maps to a very generic `value:` column family, using
 the empty column as column qualifier. To get flights, a prefix scan over `plane#TF-FIR#flight#` could be used.
@@ -58,10 +58,10 @@ and try to refactor your schema.
 As one plane is a single entity, that should ideally be the row key. We can use column families and columns to
 restructure our data:
 
-| row key | flight\:FI318 | flight\:FI319 | flight\:EW7033 | flight\:EW7036 | meta\:miles | meta\:model | meta\:operator |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| plane#TF-FIR | 2024-01-25 | 2024-01-25 |  |  | 51000000 | Boeing 757-256 | Icelandair |
-| plane#D-AIQN |  |  | 2019-10-31 | 2019-10-31 | 52142142 | Airbus A320-211 | Germanwings |
+| row key      | flight\:FI318 | flight\:FI319 | flight\:EW7033 | flight\:EW7036 | meta\:miles | meta\:model     | meta\:operator |
+| ------------ | ------------- | ------------- | -------------- | -------------- | ----------- | --------------- | -------------- |
+| plane#TF-FIR | 2024-01-25    | 2024-01-25    |                |                | 51000000    | Boeing 757-256  | Icelandair     |
+| plane#D-AIQN |               |               | 2019-10-31     | 2019-10-31     | 52142142    | Airbus A320-211 | Germanwings    |
 
 We can easily store all data in a single row, using two column families, `flight` and `meta`. Meta contains arbitrary columns
 of different kind of metadata, while each column inside `flights` is a flight number, with the cell value being the flight data.
@@ -71,20 +71,20 @@ Both layout use 10 cells, however the column-oriented one uses much simpler row 
 more readable and can be retrieved by row key instead of resorting to prefix queries.
 
 :::tip
-  Always prefer using columns instead of complex row keys if possible.
+Always prefer using columns instead of complex row keys if possible.
 :::
 
 Now, we have been tasked to extend flights to store their start and destination airport. We could keep the `flight` columns and store structured
 data (e.g. JSON) into each cell, or refactor the table to store each flight as a separate row:
 
-| row key | meta\:date | meta\:start | meta\:dest | meta\:miles | meta\:model | meta\:operator |
-| --- | --- | --- | --- | --- | --- | --- |
-| plane#TF-FIR |  |  |  | 51000000 | Boeing 757-256 | Icelandair |
-| plane#D-AIQN |  |  |  | 52142142 | Airbus A320-211 | Germanwings |
-| flight#TF-FIR#FI318 | 2024-01-25 | KEF | OSL |  |  |  |
-| flight#TF-FIR#FI319 | 2024-01-25 | OSL | KEF |  |  |  |
-| flight#D-AIQN#EW7033 | 2019-10-31 | CGN | HAM |  |  |  |
-| flight#D-AIQN#EW7036 | 2019-10-31 | HAM | CGN |  |  |  |
+| row key              | loc\:start | loc\:dest | meta\:date | meta\:miles | meta\:model     | meta\:operator |
+| -------------------- | ---------- | --------- | ---------- | ----------- | --------------- | -------------- |
+| plane#TF-FIR         |            |           |            | 51000000    | Boeing 757-256  | Icelandair     |
+| plane#D-AIQN         |            |           |            | 52142142    | Airbus A320-211 | Germanwings    |
+| flight#TF-FIR#FI318  | KEF        | OSL       | 2024-01-25 |             |                 |                |
+| flight#TF-FIR#FI319  | OSL        | KEF       | 2024-01-25 |             |                 |                |
+| flight#D-AIQN#EW7033 | CGN        | HAM       | 2019-10-31 |             |                 |                |
+| flight#D-AIQN#EW7036 | HAM        | CGN       | 2019-10-31 |             |                 |                |
 
 Now, using a scan with prefix `flight#TF-FIR#` we can get all flights of `TF-FIR`.
 
@@ -116,7 +116,7 @@ using a prefix column filter. This only works when accessing a column family of 
 
 ## Data retention
 
-Each *column family*'s data retention can be configured using two garbage collection (GC) mechanisms:
+Each _column family_'s data retention can be configured using two garbage collection (GC) mechanisms:
 
 - TTL
 - Version limit
@@ -130,7 +130,7 @@ limits.
 
 ## Real-life example: Webtable
 
-The *webtable,* the heart of the Google search engine, is stored in Bigtable. It stores web pages and references (anchors) between said pages.
+The _webtable,_ the heart of the Google search engine, is stored in Bigtable. It stores web pages and references (anchors) between said pages.
 
 `language` contains a single column containing the language code (e.g. **DE**).
 
@@ -143,7 +143,7 @@ The row key is the reversed domain key. This maximizes locality of pages under t
 
 ![Webtable](/smoltable/webtable.png)
 
-By listing the anchors of a row, we can count how many websites link to this specific page (for example to calculate the *PageRank*).
+By listing the anchors of a row, we can count how many websites link to this specific page (for example to calculate the _PageRank_).
 
 For simplicity the examples do not show full row keys. Domains alone are not enough to store the entire internet, so a real row key would also contain the pathname, like:
 
