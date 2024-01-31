@@ -151,11 +151,6 @@ For simplicity the examples do not show full row keys. Domains alone are not eno
 - `com.github/about`
 - `com.github/pricing`
 
----
-
-[1] The origin of the term "wide-column" is not exactly easy to narrow down. It was mentioned in "Scalable SQL and NoSQL Data Stores"
-by Rick Cattell in 2010. If you know an earlier mention of the term, please let us now!
-
 ## Summary
 
 This is a summary based on parts of Bigtable's documentation that apply to Smoltable. [Read more here](https://cloud.google.com/bigtable/docs/schema-design), but not everything applies to Smoltable.
@@ -187,3 +182,8 @@ This is a summary based on parts of Bigtable's documentation that apply to Smolt
   - Keep your row keys short
 - Pad integers with leading zeroes: important for timestamps where range-based queries are used
 - Do not use sequential numeric IDs as row key
+
+---
+
+[1] The origin of the term "wide-column" is not exactly easy to narrow down. It was mentioned in "Scalable SQL and NoSQL Data Stores"
+by Rick Cattell in 2010. If you know an earlier mention of the term, please let us now!
