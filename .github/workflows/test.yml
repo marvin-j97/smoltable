@@ -29,6 +29,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Rust toolchain
         run: rustup default ${{ matrix.rust_version }}
+      - name: Setup rust-fmt & clippy
+        run: rustup component add rustfmt && rustup component add clippy
       - name: Set up cargo cache
         uses: Swatinem/rust-cache@v2
         with:
