@@ -3,6 +3,12 @@ title: Environment variables
 description: Available environment variables
 ---
 
+##### `RUST_LOG`
+
+Log level based on [Rust log levels](https://docs.rs/log/latest/log/enum.Level.html).
+
+*Default: -*
+
 ##### `SMOLTABLE_DATA`
 
 Data directory.
