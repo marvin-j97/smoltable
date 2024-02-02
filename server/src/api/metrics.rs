@@ -16,11 +16,11 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.tables.write().await;
-
     let table_name = path.into_inner();
 
     let actual_name = format!("usr_{table_name}");
+
+    let tables = app_state.tables.write().await;
 
     if tables.get(&actual_name).is_some() {
         /* let rows = app_state

@@ -20,8 +20,6 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let tables = app_state.tables.read().await;
-
     let table_name = path.into_inner();
 
     if table_name.starts_with('_') {
@@ -41,6 +39,8 @@ pub async fn handler(
             &json!(null),
         ));
     }
+
+    let tables = app_state.tables.read().await;
 
     if let Some(table) = tables.get(&table_name) {
         let result = {

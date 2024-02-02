@@ -1,3 +1,4 @@
+pub mod count;
 pub mod create_column_family;
 pub mod create_table;
 pub mod delete_row;

@@ -17,8 +17,6 @@ pub async fn handler(
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
-    let mut tables = app_state.tables.write().await;
-
     let table_name = path.into_inner();
 
     if table_name.starts_with('_') {
@@ -38,6 +36,8 @@ pub async fn handler(
             &json!(null),
         ));
     }
+
+    let mut tables = app_state.tables.write().await;
 
     if let Some(table) = tables.get(&table_name).cloned() {
         app_state.manifest_table.delete_user_table(&table_name)?;

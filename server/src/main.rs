@@ -135,6 +135,7 @@ async fn main() -> smoltable::Result<()> {
             .service(api::list_tables::handler)
             .service(api::create_table::handler)
             .service(api::write::handler)
+            .service(api::count::handler)
             .service(api::get_rows::handler)
             .service(api::delete_row::handler)
             .service(api::scan::handler)

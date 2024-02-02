@@ -1,5 +1,4 @@
 use crate::app_state::AppState;
-use crate::data_point;
 use crate::error::CustomRouteResult;
 use crate::identifier::is_valid_table_identifier;
 use crate::response::build_response;
@@ -9,20 +8,12 @@ use actix_web::{
     web::{self, Path},
     HttpResponse,
 };
-use serde::{Deserialize, Serialize};
 use serde_json::json;
-use smoltable::{query::row::Input as QueryRowInput, TableWriter};
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Input {
-    items: Vec<QueryRowInput>,
-}
-
-#[post("/v1/table/{name}/rows")]
+#[post("/v1/table/{name}/count")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
-    req_body: web::Json<Input>,
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
@@ -49,10 +40,10 @@ pub async fn handler(
     let tables = app_state.tables.read().await;
 
     if let Some(table) = tables.get(&table_name) {
-        let result = {
+        let (row_count, cell_count) = {
             let table = table.clone();
 
-            tokio::task::spawn_blocking(move || table.multi_get(req_body.items.clone()))
+            tokio::task::spawn_blocking(move || table.count())
                 .await
                 .expect("should join")
         }?;
@@ -61,33 +52,21 @@ pub async fn handler(
 
         let micros_total = dur.as_micros();
 
-        let micros_per_row = if result.rows.is_empty() {
+        let micros_per_row = if row_count == 0 {
             None
         } else {
-            Some(micros_total / result.rows.len() as u128)
+            Some(micros_total / row_count as u128)
         };
-
-        TableWriter::write_batch(
-            table.metrics.clone(),
-            &[smoltable::row!(
-                "lat#read#row",
-                vec![data_point!(micros_per_row.unwrap_or_default() as f64)]
-            )],
-        )
-        .ok();
 
         Ok(build_response(
             dur,
             StatusCode::OK,
-            "Query successful",
+            "Count successful",
             &json!({
-                "affected_locality_groups": result.affected_locality_groups,
+                "row_count": row_count,
+                "cell_count": cell_count,
                 "micros": micros_total,
                 "micros_per_row": micros_per_row,
-                "rows_scanned": result.rows_scanned_count,
-                "cells_scanned": result.cells_scanned_count,
-                "bytes_scanned": result.bytes_scanned_count,
-                "rows": result.rows
             }),
         ))
     } else {

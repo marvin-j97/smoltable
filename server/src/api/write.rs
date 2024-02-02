@@ -32,8 +32,6 @@ pub async fn handler(
         return bad_request(before, "Items array should not be empty");
     }
 
-    let tables = app_state.tables.read().await;
-
     let table_name = path.into_inner();
 
     if table_name.starts_with('_') {
@@ -53,6 +51,8 @@ pub async fn handler(
             &json!(null),
         ));
     }
+
+    let tables = app_state.tables.read().await;
 
     if let Some(table) = tables.get(&table_name).cloned() {
         // TODO: use spawn_blocking
