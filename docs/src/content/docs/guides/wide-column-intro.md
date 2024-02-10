@@ -132,11 +132,9 @@ limits.
 
 The _webtable,_ the heart of the Google search engine, is stored in Bigtable. It stores web pages and references (anchors) between said pages.
 
-`language` contains a single column containing the language code (e.g. **DE**).
-
-`anchor` are links that point to the given website (`backlinks`), where each column qualifier is an anchor's href attribute. The cell value is the anchor text (`el.textContent` in JavaScript).
-
-`contents` contains a single column containing the raw HTML document. By moving it into a separate locality group the rather large documents
+- `language` contains a single column containing the language code (e.g. **DE**).
+- `anchor` are links that point to the given website (`backlinks`), where each column qualifier is an anchor's href attribute. The cell value is the anchor text (`el.textContent` in JavaScript).
+- `contents` contains a single column containing the raw HTML document. By moving it into a separate locality group the rather large documents
 will not slow down frequent queries accessing the other columns. By using cell versions, the table can store a history of the web page.
 
 The row key is the reversed domain key. This maximizes locality of pages under the same (sub-)domain.
