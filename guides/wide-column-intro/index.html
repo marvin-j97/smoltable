@@ -246,10 +246,12 @@ using a prefix column filter. This only works when accessing a column family of 
 limits.</p></section></aside>
 <h2 id="real-life-example-webtable">Real-life example: Webtable</h2>
 <p>The <em>webtable,</em> the heart of the Google search engine, is stored in Bigtable. It stores web pages and references (anchors) between said pages.</p>
-<p><code dir="auto">language</code> contains a single column containing the language code (e.g. <strong>DE</strong>).</p>
-<p><code dir="auto">anchor</code> are links that point to the given website (<code dir="auto">backlinks</code>), where each column qualifier is an anchor’s href attribute. The cell value is the anchor text (<code dir="auto">el.textContent</code> in JavaScript).</p>
-<p><code dir="auto">contents</code> contains a single column containing the raw HTML document. By moving it into a separate locality group the rather large documents
-will not slow down frequent queries accessing the other columns. By using cell versions, the table can store a history of the web page.</p>
+<ul>
+<li><code dir="auto">language</code> contains a single column containing the language code (e.g. <strong>DE</strong>).</li>
+<li><code dir="auto">anchor</code> are links that point to the given website (<code dir="auto">backlinks</code>), where each column qualifier is an anchor’s href attribute. The cell value is the anchor text (<code dir="auto">el.textContent</code> in JavaScript).</li>
+<li><code dir="auto">contents</code> contains a single column containing the raw HTML document. By moving it into a separate locality group the rather large documents
+will not slow down frequent queries accessing the other columns. By using cell versions, the table can store a history of the web page.</li>
+</ul>
 <p>The row key is the reversed domain key. This maximizes locality of pages under the same (sub-)domain.</p>
 <p><img src="/smoltable/webtable.png" alt="Webtable"></p>
 <p>By listing the anchors of a row, we can count how many websites link to this specific page (for example to calculate the <em>PageRank</em>).</p>
