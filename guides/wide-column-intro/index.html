@@ -247,7 +247,7 @@ limits.</p></section></aside>
 <h2 id="real-life-example-webtable">Real-life example: Webtable</h2>
 <p>The <em>webtable,</em> the heart of the Google search engine, is stored in Bigtable. It stores web pages and references (anchors) between said pages.</p>
 <p><code dir="auto">language</code> contains a single column containing the language code (e.g. <strong>DE</strong>).</p>
-<p><code dir="auto">anchor</code> where each column qualifier is an anchor’s href attribute. The cell value is the anchor text (<code dir="auto">el.textContent</code> in JavaScript).</p>
+<p><code dir="auto">anchor</code> are links that point to the given website (<code dir="auto">backlinks</code>), where each column qualifier is an anchor’s href attribute. The cell value is the anchor text (<code dir="auto">el.textContent</code> in JavaScript).</p>
 <p><code dir="auto">contents</code> contains a single column containing the raw HTML document. By moving it into a separate locality group the rather large documents
 will not slow down frequent queries accessing the other columns. By using cell versions, the table can store a history of the web page.</p>
 <p>The row key is the reversed domain key. This maximizes locality of pages under the same (sub-)domain.</p>
