@@ -9,8 +9,8 @@ dependencies:
     specifier: 6.1.1
     version: 6.1.1
   solid-apexcharts:
-    specifier: 0.3.3
-    version: 0.3.3(apexcharts@3.44.2)(solid-js@1.8.15)
+    specifier: 0.3.4
+    version: 0.3.4(apexcharts@3.44.2)(solid-js@1.8.15)
   solid-js:
     specifier: 1.8.15
     version: 1.8.15
@@ -1123,6 +1123,10 @@ packages:
     resolution: {integrity: sha512-Vy2wmG3NTkmHNg/kzpuvHhkqeIx3ODWqasgCRbKtbXEN0G+HpEEv9BtJLp7ZG1CZloFaC41Ah3ZFbq7aqCqMeQ==}
     dev: false
 
+  /defu@6.1.4:
+    resolution: {integrity: sha512-mEQCMmwJu317oSz8CwdIOdwf3xMif1ttiM8LTufzc3g6kR+9Pe236twL8j3IYT1F7GfRgGcW6MWxzZjLIkuHIg==}
+    dev: false
+
   /destr@2.0.2:
     resolution: {integrity: sha512-65AlobnZMiCET00KaFFjUefxDX0khFA/E4myqZ7a6Sq1yZtR8+FVIvilVX66vF2uobSumxooYZChiRPCKNqhmg==}
     dev: false
@@ -1577,15 +1581,15 @@ packages:
       totalist: 3.0.1
     dev: false
 
-  /solid-apexcharts@0.3.3(apexcharts@3.44.2)(solid-js@1.8.15):
-    resolution: {integrity: sha512-qh2VfDdtyhuPZQkM+REvdqe7yXqDAHSARnkU8IZl2uG7jj28Ak71w/cLT22DAH3QEzLWRVN+w9KnRTrLFKmM3Q==}
+  /solid-apexcharts@0.3.4(apexcharts@3.44.2)(solid-js@1.8.15):
+    resolution: {integrity: sha512-XtsQLOYhckjGXBr2bj//ai6+Ld1cjeINRVEHtrGFWI8KgtB8KuRZII+ywRWQCWvezqgAISpRrbR6NW23+V82dg==}
     engines: {node: '>=18', pnpm: '>=8.6.0'}
     peerDependencies:
       apexcharts: ^3.40.0
       solid-js: ^1.6.0
     dependencies:
       apexcharts: 3.44.2
-      defu: 6.1.3
+      defu: 6.1.4
       solid-js: 1.8.15
     dev: false
 
