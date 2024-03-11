@@ -15,13 +15,13 @@ Each row’s cells are sorted by the column key (family + qualifier), and a time
 
 which maps to some value, the `cell value`. The cell value, unlike in Bigtable, can be a certain type:
 
-- String (UTF-8 encoded string)
-- Boolean (like Byte, but is unmarshalled as boolean)
-- Byte (unsigned integer, 1 byte)
-- I32 (signed integer, 4 bytes)
-- I64 (signed integer, 8 bytes)
-- F32 (floating point, 4 bytes)
-- F64 (floating point, 8 bytes)
+- string (UTF-8 encoded string)
+- boolean (like Byte, but is unmarshalled as boolean)
+- byte (unsigned integer, 1 byte)
+- i32 (signed integer, 4 bytes)
+- i64 (signed integer, 8 bytes)
+- f32 (floating point, 4 bytes)
+- f64 (floating point, 8 bytes)
 
 The timestamp allows storing multiple versions of the same cell.
 

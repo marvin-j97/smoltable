@@ -74,10 +74,9 @@ pub fn read_row_harder() -> smoltable::Result<()> {
                 "value": {
                     "": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello2"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello2"
                         }
                     ]
                 }

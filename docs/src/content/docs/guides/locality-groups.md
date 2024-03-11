@@ -7,7 +7,7 @@ If we need to read columns of a specific column family for many rows (using a co
 
 Consider the [`webtable` example](/smoltable/guides/wide-column-intro/#real-life-example-webtable):
 
-If we wanted to get the language of all com.* pages, we would need to scan following column families:
+If we wanted to get the language of all com.\* pages, we would need to scan following column families:
 
 - `anchor`, which can be a very wide column family
 - `language`
@@ -15,7 +15,7 @@ If we wanted to get the language of all com.* pages, we would need to scan follo
 
 `language` is just 2 bytes (alpha2 country code, e.g. **DE**, **EN**, ...), but every row may require multiple kilobytes of data to be retrieved to get just the language. This heavily decreases read throughput of OLAP-style scans of large ranges.
 
-To combat this, we can define a *locality group*, which can house multiple column families. Each locality group is stored in its own LSM-tree (a single partition inside the storage engine), but row mutations across column families stay atomic.
+To combat this, we can define a _locality group_, which can house multiple column families. Each locality group is stored in its own LSM-tree (a single partition inside the storage engine), but row mutations across column families stay atomic.
 
 ![Webtable locality groups](/smoltable/webtable-locality.png)
 
@@ -125,15 +125,13 @@ curl --request POST \
       "cells": [
         {
           "column_key": "title:",
-          "value": {
-            "String": "Apache Spark™ - Unified Engine for large-scale data analytics"
-          }
+          "type": "string",
+          "value": "Apache Spark™ - Unified Engine for large-scale data analytics"
         },
         {
           "column_key": "language:",
-          "value": {
-            "String": "EN"
-          }
+          "type": "string",
+          "value": "EN"
         }
       ]
     },
@@ -142,15 +140,13 @@ curl --request POST \
       "cells": [
         {
           "column_key": "title:",
-          "value": {
-            "String": "Welcome to Apache Solr - Apache Solr"
-          }
+          "type": "string",
+          "value": "Welcome to Apache Solr - Apache Solr"
         },
         {
           "column_key": "language:",
-          "value": {
-            "String": "EN"
-          }
+          "type": "string",
+          "value": "EN"
         }
       ]
     }
@@ -195,10 +191,9 @@ Smoltable returns (again, body truncated for brevity):
           "title": {
             "": [
               {
-                "timestamp": 1706197595375136143,
-                "value": {
-                  "String": "Apache Cassandra | Apache Cassandra Documentation"
-                }
+                "time": 1706197595375136143,
+                "type": "string",
+                "value": "Apache Cassandra | Apache Cassandra Documentation"
               }
             ]
           }
@@ -284,9 +279,7 @@ By listing our table, we can see the column families have been created, and `tit
           "disk_space_in_bytes": 0,
           "locality_groups": [
             {
-              "column_families": [
-                "title"
-              ],
+              "column_families": ["title"],
               "id": "ur_pSQZ2QAYR6XsF9Xz0o"
             }
           ],
@@ -354,10 +347,9 @@ which returns (truncated):
           "title": {
             "": [
               {
-                "timestamp": 1706198298766257607,
-                "value": {
-                  "String": "Apache Cassandra | Apache Cassandra Documentation"
-                }
+                "time": 1706198298766257607,
+                "type": "string",
+                "value": "Apache Cassandra | Apache Cassandra Documentation"
               }
             ]
           }

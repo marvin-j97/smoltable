@@ -25,13 +25,13 @@ Each row can have a different set of columns (schema-less). The table is sparse,
 
 In Bigtable, stored values are byte blobs; Smoltable supports multiple data types out of the box:
 
-- String (UTF-8 encoded string)
-- Boolean (like Byte, but is unmarshalled as boolean)
-- Byte (unsigned integer, 1 byte)
-- I32 (signed integer, 4 bytes)
-- I64 (signed integer, 8 bytes)
-- F32 (floating point, 4 bytes)
-- F64 (floating point, 8 bytes)
+- string (UTF-8 encoded string)
+- boolean (like Byte, but is unmarshalled as boolean)
+- byte (unsigned integer, 1 byte)
+- i32 (signed integer, 4 bytes)
+- i64 (signed integer, 8 bytes)
+- f32 (floating point, 4 bytes)
+- f64 (floating point, 8 bytes)
 
 Column families can be grouped into locality groups, which partition groups of column families into separate LSM-trees, increasing scan performance over those column families (e.g. OLAP-style queries over a specific column).
 

@@ -11,13 +11,13 @@ POST http://smoltable:9876/v1/table/[name]/rows
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"key": "org.apache.spark"
-			}
-		}
-	]
+  "items": [
+    {
+      "row": {
+        "key": "org.apache.spark"
+      }
+    }
+  ]
 }
 ```
 
@@ -25,33 +25,32 @@ POST http://smoltable:9876/v1/table/[name]/rows
 
 ```json
 {
-	"message": "Query successful",
-	"result": {
-		"bytes_scanned": 124,
-		"cells_scanned": 1,
-		"micros": 23,
-		"micros_per_row": 23,
-		"rows": [
-			{
-				"columns": {
-					"title": {
-						"": [
-							{
-								"timestamp": 0,
-								"value": {
-									"String": "Apache Spark"
-								}
-							}
-						]
-					}
-				},
-				"row_key": "org.apache.spark"
-			}
-		],
-		"rows_scanned": 1
-	},
-	"status": 200,
-	"time_ms": 0
+  "message": "Query successful",
+  "result": {
+    "bytes_scanned": 124,
+    "cells_scanned": 1,
+    "micros": 23,
+    "micros_per_row": 23,
+    "rows": [
+      {
+        "columns": {
+          "title": {
+            "": [
+              {
+                "time": 0,
+                "type": "string",
+                "value": "Apache Spark"
+              }
+            ]
+          }
+        },
+        "row_key": "org.apache.spark"
+      }
+    ],
+    "rows_scanned": 1
+  },
+  "status": 200,
+  "time_ms": 0
 }
 ```
 
@@ -59,16 +58,16 @@ POST http://smoltable:9876/v1/table/[name]/rows
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"key": "org.apache.spark"
-			},
+  "items": [
+    {
+      "row": {
+        "key": "org.apache.spark"
+      },
       "column": {
-				"key": "anchor:"
-			}
-		}
-	]
+        "key": "anchor:"
+      }
+    }
+  ]
 }
 ```
 
@@ -76,16 +75,16 @@ POST http://smoltable:9876/v1/table/[name]/rows
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"key": "org.apache.spark"
-			},
+  "items": [
+    {
+      "row": {
+        "key": "org.apache.spark"
+      },
       "column": {
-				"key": "anchor:com.apache.solr"
-			}
-		}
-	]
+        "key": "anchor:com.apache.solr"
+      }
+    }
+  ]
 }
 ```
 
@@ -93,19 +92,16 @@ POST http://smoltable:9876/v1/table/[name]/rows
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"key": "org.apache.spark"
-			},
+  "items": [
+    {
+      "row": {
+        "key": "org.apache.spark"
+      },
       "column": {
-				"multi_key": [
-          "anchor:com.apache.solr",
-          "anchor:com.apache.hbase"
-        ]
-			}
-		}
-	]
+        "multi_key": ["anchor:com.apache.solr", "anchor:com.apache.hbase"]
+      }
+    }
+  ]
 }
 ```
 
@@ -113,16 +109,16 @@ POST http://smoltable:9876/v1/table/[name]/rows
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"key": "org.apache.spark"
-			},
+  "items": [
+    {
+      "row": {
+        "key": "org.apache.spark"
+      },
       "column": {
-				"prefix": "anchor:com."
-			}
-		}
-	]
+        "prefix": "anchor:com."
+      }
+    }
+  ]
 }
 ```
 
@@ -130,16 +126,16 @@ POST http://smoltable:9876/v1/table/[name]/rows
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"key": "org.apache.spark"
-			},
-			"column": {
-				"cell_limit": 3
-			}
-		}
-	]
+  "items": [
+    {
+      "row": {
+        "key": "org.apache.spark"
+      },
+      "column": {
+        "cell_limit": 3
+      }
+    }
+  ]
 }
 ```
 
@@ -147,14 +143,14 @@ POST http://smoltable:9876/v1/table/[name]/rows
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"key": "org.apache.spark",
+  "items": [
+    {
+      "row": {
+        "key": "org.apache.spark",
         "cell_limit": 10
-			}
-		}
-	]
+      }
+    }
+  ]
 }
 ```
 

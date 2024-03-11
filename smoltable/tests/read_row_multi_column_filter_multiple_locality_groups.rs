@@ -93,10 +93,9 @@ pub fn read_row_multi_column_filter_multiple_locality_groups() -> smoltable::Res
                 "another_one": {
                     "": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello3"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello3"
                         }
                     ]
                 }
@@ -129,10 +128,9 @@ pub fn read_row_multi_column_filter_multiple_locality_groups() -> smoltable::Res
                 "another": {
                     "": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello2"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello2"
                         }
                     ]
                 }

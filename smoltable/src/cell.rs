@@ -8,30 +8,132 @@ use std::sync::Arc;
 ///
 /// Smoltable supports various data types for better DX.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(tag = "type", content = "value")]
 pub enum Value {
+    #[serde(rename = "string")]
     /// UTF-8 encoded string
     String(String),
 
+    #[serde(rename = "boolean")]
     /// like Byte, but is unmarshalled as boolean
     Boolean(bool),
 
+    #[serde(rename = "byte")]
     /// unsigned integer, 1 byte
     Byte(u8),
 
+    #[serde(rename = "i32")]
     /// signed integer, 4 bytes
     I32(i32),
 
+    #[serde(rename = "i64")]
     /// signed integer, 8 bytes
     I64(i64),
 
+    #[serde(rename = "f32")]
     /// floating point, 4 bytes
     F32(f32),
 
+    #[serde(rename = "f64")]
     /// floating point, 8 bytes
     F64(f64),
 }
 
-/// A cell and its meta information
+impl Value {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            Value::String(s) => {
+                let mut bytes = vec![0u8; 1 + s.len()];
+                bytes[0] = 0;
+                bytes[1..].copy_from_slice(s.as_bytes());
+                bytes
+            }
+            Value::Boolean(b) => vec![1, *b as u8],
+            Value::Byte(byte) => vec![2, *byte],
+            Value::I32(i) => {
+                let bytes: [u8; 4] = i.to_be_bytes();
+                vec![3, bytes[0], bytes[1], bytes[2], bytes[3]]
+            }
+            Value::I64(i) => {
+                let bytes: [u8; 8] = i.to_be_bytes();
+                vec![
+                    4, bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
+                    bytes[7],
+                ]
+            }
+            Value::F32(f) => {
+                let bytes: [u8; 4] = f.to_be_bytes();
+                vec![5, bytes[0], bytes[1], bytes[2], bytes[3]]
+            }
+            Value::F64(f) => {
+                let bytes: [u8; 8] = f.to_be_bytes();
+                vec![
+                    6, bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
+                    bytes[7],
+                ]
+            }
+        }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes.is_empty() {
+            return None;
+        }
+
+        match bytes[0] {
+            0 => {
+                let string_len = bytes.len() - 1;
+                let string_bytes = &bytes[1..];
+
+                if string_len > 0 {
+                    let string =
+                        String::from_utf8(string_bytes.to_vec()).expect("should be utf-8 string");
+
+                    Some(Value::String(string))
+                } else {
+                    Some(Value::String(String::new()))
+                }
+            }
+            1 => Some(Value::Boolean(bytes[1] != 0)),
+            2 => Some(Value::Byte(bytes[1])),
+            3 => {
+                if bytes.len() < 5 {
+                    None
+                } else {
+                    let i = i32::from_be_bytes(bytes[1..5].try_into().expect("should deserialize"));
+                    Some(Value::I32(i))
+                }
+            }
+            4 => {
+                if bytes.len() < 9 {
+                    None
+                } else {
+                    let i = i64::from_be_bytes(bytes[1..9].try_into().expect("should deserialize"));
+                    Some(Value::I64(i))
+                }
+            }
+            5 => {
+                if bytes.len() < 5 {
+                    None
+                } else {
+                    let f = f32::from_be_bytes(bytes[1..5].try_into().expect("should deserialize"));
+                    Some(Value::F32(f))
+                }
+            }
+            6 => {
+                if bytes.len() < 9 {
+                    None
+                } else {
+                    let f = f64::from_be_bytes(bytes[1..9].try_into().expect("should deserialize"));
+                    Some(Value::F64(f))
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
+/// A cell and its meta information visited by an iterator
 #[derive(Clone, Debug)]
 pub struct VisitedCell {
     /// The raw cell key, which is `row_key:cf:cq:!ts`
@@ -109,7 +211,7 @@ impl VisitedCell {
                 family: cf.to_owned(),
                 qualifier: cq,
             },
-            value: bincode::deserialize::<Value>(value).expect("should deserialize"),
+            value: Value::from_bytes(value).expect("should deserialize"),
         }
     }
 
@@ -171,7 +273,10 @@ impl VisitedCell {
 /// User-facing cell content
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Cell {
+    #[serde(rename = "time")]
     pub timestamp: u128,
+
+    #[serde(flatten)]
     pub value: Value,
 }
 
@@ -185,12 +290,30 @@ mod tests {
     fn cell_format_key() {
         let key = VisitedCell::format_key("test", &ColumnKey::try_from("value:").unwrap(), 0);
 
-        let cell = VisitedCell::parse(
-            key.clone().into(),
-            &bincode::serialize(&CellValue::Byte(0)).unwrap(),
-        );
+        let cell = VisitedCell::parse(key.clone().into(), &CellValue::Byte(0).to_bytes());
 
         assert_eq!(cell.raw_key, key.into());
         assert_eq!(cell.value, CellValue::Byte(0));
+    }
+
+    #[test]
+    fn cell_serde() {
+        let cell = Cell {
+            timestamp: 0,
+            value: Value::String("test".into()),
+        };
+
+        let s = serde_json::to_string(&cell).unwrap();
+        let p: Cell = serde_json::from_str(&s).unwrap();
+
+        assert_eq!(
+            p,
+            serde_json::from_str(
+                r#"
+        {"time":0,"type":"string","value":"test"}
+        "#
+            )
+            .unwrap()
+        );
     }
 }

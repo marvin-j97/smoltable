@@ -73,10 +73,9 @@ pub fn read_row_simple_column_filter() -> smoltable::Result<()> {
                 "value": {
                     "": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello"
                         }
                     ]
                 }

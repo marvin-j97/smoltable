@@ -61,18 +61,16 @@ pub fn read_row_column_cell_limit() -> smoltable::Result<()> {
                 "value": {
                     "asd": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello"
                         }
                     ],
                     "def": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello2"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello2"
                         }
                     ]
                 }
@@ -147,30 +145,26 @@ pub fn write_read_row_multiple_columns_cell_limit() -> smoltable::Result<()> {
                 "value": {
                     "asd": [
                         {
-                            "timestamp": 5,
-                            "value": {
-                                "String": "hello5"
-                            }
+                            "time": 5,
+                            "type": "string",
+                            "value": "hello5"
                         },
                         {
-                            "timestamp": 4,
-                            "value": {
-                                "String": "hello4"
-                            }
+                            "time": 4,
+                            "type": "string",
+                            "value": "hello4"
                         }
                     ],
                     "def": [
                         {
-                            "timestamp": 5,
-                            "value": {
-                                "String": "hello5"
-                            }
+                            "time": 5,
+                            "type": "string",
+                            "value": "hello5"
                         },
                         {
-                            "timestamp": 4,
-                            "value": {
-                                "String": "hello4"
-                            }
+                            "time": 4,
+                            "type": "string",
+                            "value": "hello4"
                         }
                     ]
                 }

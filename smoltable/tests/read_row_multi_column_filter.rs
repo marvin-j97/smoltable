@@ -88,20 +88,18 @@ pub fn read_row_multi_column_filter() -> smoltable::Result<()> {
                 "value": {
                     "": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello"
                         }
                     ]
                 },
                 "another_one": {
                     "": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello3"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello3"
                         }
                     ]
                 }

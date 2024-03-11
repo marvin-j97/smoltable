@@ -90,10 +90,9 @@ pub fn scan_prefix_simple_row_limit() -> smoltable::Result<()> {
                     "value": {
                         "": [
                             {
-                                "timestamp": 0,
-                                "value": {
-                                    "String": "hello"
-                                }
+                                "time": 0,
+                                "type": "string",
+                                "value": "hello"
                             }
                         ]
                     }

@@ -11,13 +11,13 @@ POST http://smoltable:9876/v1/table/[name]/scan
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"prefix": "org."
-			}
-		}
-	]
+  "items": [
+    {
+      "row": {
+        "prefix": "org."
+      }
+    }
+  ]
 }
 ```
 
@@ -25,48 +25,46 @@ POST http://smoltable:9876/v1/table/[name]/scan
 
 ```json
 {
-	"message": "Query successful",
-	"result": {
-		"bytes_scanned": 124124,
-		"cells_scanned": 2,
-		"micros": 100,
-		"micros_per_row": 50,
-		"rows": [
-			{
-				"columns": {
-					"title": {
-						"": [
-							{
-								"timestamp": 0,
-								"value": {
-									"String": "Apache Solr"
-								}
-							}
-						]
-					}
-				},
-				"row_key": "org.apache.solr"
-			},
-			{
-				"columns": {
-					"title": {
-						"": [
-							{
-								"timestamp": 0,
-								"value": {
-									"String": "Apache Spark"
-								}
-							}
-						]
-					}
-				},
-				"row_key": "org.apache.spark"
-			}
-		],
-		"rows_scanned": 2
-	},
-	"status": 200,
-	"time_ms": 0
+  "message": "Query successful",
+  "result": {
+    "bytes_scanned": 124124,
+    "cells_scanned": 2,
+    "micros": 100,
+    "micros_per_row": 50,
+    "rows": [
+      {
+        "columns": {
+          "title": {
+            "": [
+              {
+                "time": 0,
+                "type": "string",
+                "value": "Apache Solr"
+              }
+            ]
+          }
+        },
+        "row_key": "org.apache.solr"
+      },
+      {
+        "columns": {
+          "title": {
+            "": [
+              {
+                "time": 0,
+                "type": "string",
+                "value": "Apache Spark"
+              }
+            ]
+          }
+        },
+        "row_key": "org.apache.spark"
+      }
+    ],
+    "rows_scanned": 2
+  },
+  "status": 200,
+  "time_ms": 0
 }
 ```
 
@@ -74,16 +72,16 @@ POST http://smoltable:9876/v1/table/[name]/scan
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"prefix": "org.apache."
-			},
+  "items": [
+    {
+      "row": {
+        "prefix": "org.apache."
+      },
       "column": {
-				"key": "anchor:"
-			}
-		}
-	]
+        "key": "anchor:"
+      }
+    }
+  ]
 }
 ```
 
@@ -91,16 +89,16 @@ POST http://smoltable:9876/v1/table/[name]/scan
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"prefix": "org.apache."
-			},
+  "items": [
+    {
+      "row": {
+        "prefix": "org.apache."
+      },
       "column": {
-				"key": "anchor:com.apache.solr"
-			}
-		}
-	]
+        "key": "anchor:com.apache.solr"
+      }
+    }
+  ]
 }
 ```
 
@@ -108,19 +106,16 @@ POST http://smoltable:9876/v1/table/[name]/scan
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"prefix": "org.apache."
-			},
+  "items": [
+    {
+      "row": {
+        "prefix": "org.apache."
+      },
       "column": {
-				"multi_key": [
-          "anchor:com.apache.solr",
-          "anchor:com.apache.hbase"
-        ]
-			}
-		}
-	]
+        "multi_key": ["anchor:com.apache.solr", "anchor:com.apache.hbase"]
+      }
+    }
+  ]
 }
 ```
 
@@ -128,16 +123,16 @@ POST http://smoltable:9876/v1/table/[name]/scan
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"prefix": "org.apache."
-			},
+  "items": [
+    {
+      "row": {
+        "prefix": "org.apache."
+      },
       "column": {
-				"prefix": "anchor:com."
-			}
-		}
-	]
+        "prefix": "anchor:com."
+      }
+    }
+  ]
 }
 ```
 
@@ -145,16 +140,16 @@ POST http://smoltable:9876/v1/table/[name]/scan
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"prefix": "org.apache."
-			},
-			"column": {
-				"cell_limit": 3
-			}
-		}
-	]
+  "items": [
+    {
+      "row": {
+        "prefix": "org.apache."
+      },
+      "column": {
+        "cell_limit": 3
+      }
+    }
+  ]
 }
 ```
 
@@ -162,14 +157,14 @@ POST http://smoltable:9876/v1/table/[name]/scan
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"prefix": "org.apache.",
+  "items": [
+    {
+      "row": {
+        "prefix": "org.apache.",
         "cell_limit": 10
-			}
-		}
-	]
+      }
+    }
+  ]
 }
 ```
 
@@ -177,16 +172,16 @@ POST http://smoltable:9876/v1/table/[name]/scan
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"prefix": "org.apache."
-			},
-			"cell": {
-				"limit": 10
-			}
-		}
-	]
+  "items": [
+    {
+      "row": {
+        "prefix": "org.apache."
+      },
+      "cell": {
+        "limit": 10
+      }
+    }
+  ]
 }
 ```
 
@@ -194,14 +189,14 @@ POST http://smoltable:9876/v1/table/[name]/scan
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"prefix": "org.apache.",
+  "items": [
+    {
+      "row": {
+        "prefix": "org.apache.",
         "limit": 10
-			}
-		}
-	]
+      }
+    }
+  ]
 }
 ```
 
@@ -209,14 +204,14 @@ POST http://smoltable:9876/v1/table/[name]/scan
 
 ```json
 {
-	"items": [
-		{
-			"row": {
-				"prefix": "org.apache.",
+  "items": [
+    {
+      "row": {
+        "prefix": "org.apache.",
         "sample": 0.1
-			}
-		}
-	]
+      }
+    }
+  ]
 }
 ```
 

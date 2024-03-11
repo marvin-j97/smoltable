@@ -59,10 +59,9 @@ pub fn read_row_simple() -> smoltable::Result<()> {
                 "value": {
                     "": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello"
                         }
                     ]
                 }
@@ -125,18 +124,16 @@ pub fn read_row_simple_multiple_columns() -> smoltable::Result<()> {
                 "value": {
                     "asd": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello"
                         }
                     ],
                     "def": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello2"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello2"
                         }
                     ]
                 }

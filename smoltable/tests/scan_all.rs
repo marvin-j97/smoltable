@@ -87,18 +87,16 @@ pub fn scan_all() -> smoltable::Result<()> {
                     "value": {
                         "asd": [
                             {
-                                "timestamp": 0,
-                                "value": {
-                                    "String": "hello"
-                                }
+                                "time": 0,
+                                "type": "string",
+                                "value": "hello"
                             }
                         ],
                         "def": [
                             {
-                                "timestamp": 0,
-                                "value": {
-                                    "String": "hello2"
-                                }
+                                "time": 0,
+                                "type": "string",
+                                "value": "hello2"
                             }
                         ]
                     }
@@ -110,18 +108,16 @@ pub fn scan_all() -> smoltable::Result<()> {
                     "value": {
                         "yxc": [
                             {
-                                "timestamp": 0,
-                                "value": {
-                                    "String": "hello"
-                                }
+                                "time": 0,
+                                "type": "string",
+                                "value": "hello"
                             }
                         ],
                         "cxy": [
                             {
-                                "timestamp": 0,
-                                "value": {
-                                    "String": "hello2"
-                                }
+                                "time": 0,
+                                "type": "string",
+                                "value": "hello2"
                             }
                         ]
                     }
@@ -133,10 +129,9 @@ pub fn scan_all() -> smoltable::Result<()> {
                     "value": {
                         "asd": [
                             {
-                                "timestamp": 0,
-                                "value": {
-                                    "String": "hello"
-                                }
+                                "time": 0,
+                                "type": "string",
+                                "value": "hello"
                             }
                         ]
                     }
@@ -148,18 +143,16 @@ pub fn scan_all() -> smoltable::Result<()> {
                     "value": {
                         "asd": [
                             {
-                                "timestamp": 0,
-                                "value": {
-                                    "String": "hello"
-                                }
+                                "time": 0,
+                                "type": "string",
+                                "value": "hello"
                             }
                         ],
                         "dsa": [
                             {
-                                "timestamp": 0,
-                                "value": {
-                                    "String": "hello2"
-                                }
+                                "time": 0,
+                                "type": "string",
+                                "value": "hello2"
                             }
                         ]
                     }

@@ -67,20 +67,18 @@ pub fn read_row_multiple_families() -> smoltable::Result<()> {
                 "value": {
                     "": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello"
                         }
                     ]
                 },
                 "another": {
                     "": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello2"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello2"
                         }
                     ]
                 }

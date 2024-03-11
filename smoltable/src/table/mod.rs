@@ -312,6 +312,11 @@ impl Smoltable {
     pub fn approximate_count(&self) -> crate::Result<(usize, usize)> {
         let cell_count = self.approximate_cell_count()? as usize;
         let cf_count = self.column_family_count()?;
+
+        if cf_count == 0 {
+            return Ok((0, 0));
+        }
+
         let row_count = cell_count / cf_count;
         Ok((row_count, cell_count))
     }

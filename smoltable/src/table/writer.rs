@@ -10,8 +10,12 @@ pub struct Writer {
 
 #[derive(Debug, Deserialize)]
 pub struct ColumnWriteItem {
-    pub column_key: ColumnKey,
+    pub column_key: ColumnKey, // TODO: rename "column"?
+
+    #[serde(rename = "time")]
     pub timestamp: Option<u128>,
+
+    #[serde(flatten)]
     pub value: CellValue,
 }
 
@@ -55,12 +59,11 @@ impl Writer {
                 cell.timestamp.unwrap_or_else(timestamp_nano),
             );
 
-            let encoded_value = bincode::serialize(&cell.value).expect("should serialize");
-
             let partition = self
                 .table
                 .get_partition_for_column_family(&cell.column_key.family)?;
 
+            let encoded_value = cell.value.to_bytes();
             self.batch.insert(&partition, key, encoded_value);
         }
 

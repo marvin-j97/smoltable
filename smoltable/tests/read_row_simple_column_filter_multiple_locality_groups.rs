@@ -74,10 +74,9 @@ pub fn read_row_simple_column_filter_multiple_locality_groups() -> smoltable::Re
                 "value": {
                     "": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello"
                         }
                     ]
                 }
@@ -108,10 +107,9 @@ pub fn read_row_simple_column_filter_multiple_locality_groups() -> smoltable::Re
                 "another": {
                     "": [
                         {
-                            "timestamp": 0,
-                            "value": {
-                                "String": "hello2"
-                            }
+                            "time": 0,
+                            "type": "string",
+                            "value": "hello2"
                         }
                     ]
                 }
