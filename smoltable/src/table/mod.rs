@@ -244,7 +244,7 @@ impl Smoltable {
         Ok(())
     }
 
-    /// Creates a dedicated block cache for the table.
+    /*  /// Creates a dedicated block cache for the table.
     ///
     /// Will be applied after restart automatically, no need to call after every start.
     pub fn set_cache_size(&self, bytes: u64) -> crate::Result<()> {
@@ -257,7 +257,7 @@ impl Smoltable {
         self.keyspace.persist()?;
 
         Ok(())
-    }
+    } */
 
     /// Creates column families.
     ///
@@ -541,6 +541,8 @@ impl Smoltable {
         use reader::Reader as TableReader;
 
         let column_filter = &input.column.as_ref().and_then(|x| x.filter.clone());
+
+        let row_offset = input.row.offset.unwrap_or_default() as u64;
         let row_limit = input.row.limit.unwrap_or(u32::from(u16::MAX)) as usize;
 
         let column_cell_limit = input
@@ -560,9 +562,9 @@ impl Smoltable {
         let locality_groups_to_scan = get_affected_locality_groups(self, column_filter)?;
         let instant = self.keyspace.instant();
 
-        let mut rows_scanned_count = 0;
-        let mut cells_scanned_count = 0;
-        let mut bytes_scanned_count = 0;
+        let mut rows_scanned_count: u64 = 0;
+        let mut cells_scanned_count: u64 = 0;
+        let mut bytes_scanned_count: u64 = 0;
         let mut cell_count = 0; // Cell count over all aggregated rows
 
         let mut row_sample_counter = 1.0_f32;
@@ -652,6 +654,11 @@ impl Smoltable {
                 }
             }
 
+            // TODO: test
+            if rows_scanned_count < row_offset {
+                continue;
+            }
+
             // IMPORTANT: Even if the row has no matching columns, we need to temporarily add it to
             // the buffer, so we can track in which row we are currently in (to increment `rows_scanned_count`)
             // After that it gets removed, if the column count stays 0
@@ -668,7 +675,7 @@ impl Smoltable {
                 .columns
                 .entry(cell.column_key.family)
                 .or_default()
-                .entry(cell.column_key.qualifier.unwrap_or(String::from("")))
+                .entry(cell.column_key.qualifier.unwrap_or_default())
                 .or_default();
 
             if version_history.len() >= column_cell_limit {
@@ -749,7 +756,7 @@ impl Smoltable {
             let version_history = columns
                 .entry(cell.column_key.family)
                 .or_default()
-                .entry(cell.column_key.qualifier.unwrap_or(String::from("_")))
+                .entry(cell.column_key.qualifier.unwrap_or_default())
                 .or_default();
 
             if version_history.len() < column_cell_limit as usize {

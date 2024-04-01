@@ -170,11 +170,7 @@ impl VisitedCell {
             "{}:{}:{}:",
             row_key,
             column_key.family,
-            column_key
-                .qualifier
-                .as_ref()
-                .cloned()
-                .unwrap_or_else(|| String::from("")),
+            column_key.qualifier.as_ref().cloned().unwrap_or_default(),
         )
         .as_bytes()
         .to_vec();
@@ -190,7 +186,7 @@ impl VisitedCell {
         buf.clone_from_slice(&key[(key.len() - std::mem::size_of::<u128>())..key.len()]);
         let ts = !u128::from_be_bytes(buf);
 
-        // NOTE: + 1 because of : delimiter
+        // NOTE: -1 because of : delimiter
         let key_without_ts = &key[0..(key.len() - std::mem::size_of::<u128>() - 1)];
         let mut parsed_key = key_without_ts.rsplitn(3, |&e| e == b':');
 
@@ -205,7 +201,7 @@ impl VisitedCell {
 
         VisitedCell {
             raw_key: key.clone(),
-            row_key: row_key.into(),
+            row_key: row_key.to_owned(),
             timestamp: ts,
             column_key: ColumnKey {
                 family: cf.to_owned(),
@@ -223,7 +219,7 @@ impl VisitedCell {
                 }
 
                 if let Some(cq_filter) = &key.qualifier {
-                    if self.column_key.qualifier.as_deref().unwrap_or("") != cq_filter {
+                    if self.column_key.qualifier.as_deref().unwrap_or_default() != cq_filter {
                         return false;
                     }
                 }
@@ -237,7 +233,7 @@ impl VisitedCell {
                     }
 
                     if let Some(cq_filter) = &key.qualifier {
-                        if self.column_key.qualifier.as_deref().unwrap_or("") == cq_filter {
+                        if self.column_key.qualifier.as_deref().unwrap_or_default() == cq_filter {
                             return true;
                         }
                     } else {
@@ -257,7 +253,7 @@ impl VisitedCell {
                         .column_key
                         .qualifier
                         .as_deref()
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .starts_with(cq_filter)
                     {
                         return false;

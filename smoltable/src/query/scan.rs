@@ -25,6 +25,7 @@ pub struct RowOptions {
     #[serde(flatten)]
     pub scan: ScanMode,
 
+    pub offset: Option<u32>,
     pub limit: Option<u32>,
     pub cell_limit: Option<u32>,
     pub sample: Option<f32>,

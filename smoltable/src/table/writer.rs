@@ -42,6 +42,7 @@ impl Writer {
         }
     }
 
+    /// Convenience function for opening and committing a write batch
     pub fn write_batch(table: Smoltable, items: &[RowWriteItem]) -> crate::Result<()> {
         let mut writer = Self::new(table);
         for item in items {
@@ -51,6 +52,7 @@ impl Writer {
         Ok(())
     }
 
+    /// Appends to the write batch
     pub fn write(&mut self, item: &RowWriteItem) -> crate::Result<()> {
         for cell in &item.cells {
             let key = VisitedCell::format_key(

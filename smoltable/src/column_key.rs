@@ -37,7 +37,7 @@ impl std::fmt::Display for ColumnKey {
             f,
             "{}:{}",
             self.family,
-            self.qualifier.as_deref().unwrap_or("")
+            self.qualifier.as_deref().unwrap_or_default()
         )
     }
 }
@@ -108,5 +108,21 @@ impl<'de> Deserialize<'de> for ColumnKey {
         }
 
         deserializer.deserialize_str(ColumnKeyVisitor)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_log::test;
+
+    #[test]
+    fn display_column_keys() {
+        assert_eq!("test:", ColumnKey::try_from("test:").unwrap().to_string());
+
+        assert_eq!(
+            "test:abc",
+            ColumnKey::try_from("test:abc").unwrap().to_string()
+        );
     }
 }

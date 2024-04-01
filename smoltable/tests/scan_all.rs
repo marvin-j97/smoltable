@@ -70,6 +70,7 @@ pub fn scan_all() -> smoltable::Result<()> {
         row: QueryPrefixRowOptions {
             scan: smoltable::query::scan::ScanMode::Prefix(String::from("")),
             cell_limit: None,
+            offset: None,
             limit: None,
             sample: None,
         },

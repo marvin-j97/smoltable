@@ -73,6 +73,7 @@ pub fn scan_prefix_simple() -> smoltable::Result<()> {
         row: QueryPrefixRowOptions {
             scan: smoltable::query::scan::ScanMode::Prefix(String::from("a")),
             cell_limit: None,
+            offset: None,
             limit: None,
             sample: None,
         },
@@ -107,6 +108,7 @@ pub fn scan_prefix_simple() -> smoltable::Result<()> {
         row: QueryPrefixRowOptions {
             scan: smoltable::query::scan::ScanMode::Prefix(String::from("b")),
             cell_limit: None,
+            offset: None,
             limit: None,
             sample: None,
         },
@@ -216,6 +218,7 @@ pub fn scan_prefix_simple_multiple_columns() -> smoltable::Result<()> {
         row: QueryPrefixRowOptions {
             scan: smoltable::query::scan::ScanMode::Prefix(String::from("a")),
             cell_limit: None,
+            offset: None,
             limit: None,
             sample: None,
         },
@@ -256,6 +259,7 @@ pub fn scan_prefix_simple_multiple_columns() -> smoltable::Result<()> {
         row: QueryPrefixRowOptions {
             scan: smoltable::query::scan::ScanMode::Prefix(String::from("b")),
             cell_limit: None,
+            offset: None,
             limit: None,
             sample: None,
         },
