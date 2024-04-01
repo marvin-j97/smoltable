@@ -1,5 +1,5 @@
 {
-  "name": "app",
+  "name": "@smoltable/dashboard",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,13 +10,13 @@
   },
   "dependencies": {
     "pretty-bytes": "6.1.1",
-    "solid-apexcharts": "0.3.3",
-    "solid-js": "1.8.15",
-    "unocss": "0.58.4"
+    "solid-apexcharts": "0.3.4",
+    "solid-js": "1.8.16",
+    "unocss": "0.58.5"
   },
   "devDependencies": {
-    "typescript": "5.3.3",
-    "vite": "4",
-    "vite-plugin-solid": "2.9.1"
+    "typescript": "5.4.3",
+    "vite": "5.2.7",
+    "vite-plugin-solid": "2.10.2"
   }
 }
