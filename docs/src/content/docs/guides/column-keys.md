@@ -4,7 +4,7 @@ description: About column keys
 ---
 
 A column key consists of two **case-sensitive** components, separated by `:` (colon):
- 
+
 - column family name
 - column qualifier
 

@@ -13,9 +13,9 @@ PUT http://smoltable:9876/v1/table/[name]
 
 ```json
 {
-	"message": "Table created successfully",
-	"result": null,
-	"status": 201,
-	"time_ms": 33
+  "message": "Table created successfully",
+  "result": null,
+  "status": 201,
+  "time_ms": 33
 }
 ```

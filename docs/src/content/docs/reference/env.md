@@ -7,30 +7,30 @@ description: Available environment variables
 
 Log level based on [Rust log levels](https://docs.rs/log/latest/log/enum.Level.html).
 
-*Default: -*
+_Default: -_
 
 ##### `SMOLTABLE_DATA`
 
 Data directory.
 
-*Default: .smoltable_data*
+_Default: .smoltable_data_
 
 ##### `SMOLTABLE_METRICS_CAP_MB`
 
-Maximum size of metrics to store *per table*.
+Maximum size of metrics to store _per table_.
 
-*Default: 1 MiB*
+_Default: 1 MiB_
 
 ##### `SMOLTABLE_HTTP_PORT`
 
-> Aliases: SMOLTABLE_PORT, PORT
+> Aliases: SMOLTABLE_PORT, HTTP_PORT, PORT
 
 HTTP port to listen to.
 
-*Default: 9876*
+_Default: 9876_
 
 ##### `SMOLTABLE_WRITE_BUFFER_SIZE_MB`
 
 Global write buffer size, shared by all tables, locality groups, metrics tables and internal tables.
 
-*Default: 64 MiB*
+_Default: 64 MiB_

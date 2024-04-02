@@ -11,14 +11,14 @@ POST http://smoltable:9876/v1/table/[name]/column-family
 
 ```json
 {
-	"column_families": [
-		{
-			"name": "language"
-		},
-		{
-			"name": "title"
-		}
-	]
+  "column_families": [
+    {
+      "name": "language"
+    },
+    {
+      "name": "title"
+    }
+  ]
 }
 ```
 
@@ -26,10 +26,10 @@ POST http://smoltable:9876/v1/table/[name]/column-family
 
 ```json
 {
-	"message": "Column families created successfully",
-	"result": null,
-	"status": 201,
-	"time_ms": 25
+  "message": "Column families created successfully",
+  "result": null,
+  "status": 201,
+  "time_ms": 25
 }
 ```
 
@@ -37,12 +37,12 @@ POST http://smoltable:9876/v1/table/[name]/column-family
 
 ```json
 {
-	"column_families": [
-		{
-			"name": "anchor"
-		}
-	],
-	"locality_group": true
+  "column_families": [
+    {
+      "name": "anchor"
+    }
+  ],
+  "locality_group": true
 }
 ```
 
@@ -50,15 +50,15 @@ POST http://smoltable:9876/v1/table/[name]/column-family
 
 ```json
 {
-	"column_families": [
-		{
-			"name": "title",
-			"gc_settings": {
-				"version_limit": 10,
-				"ttl_secs": null
-			}
-		}
-	]
+  "column_families": [
+    {
+      "name": "title",
+      "gc_settings": {
+        "version_limit": 10,
+        "ttl_secs": null
+      }
+    }
+  ]
 }
 ```
 
