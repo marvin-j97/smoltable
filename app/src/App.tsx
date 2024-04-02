@@ -1,8 +1,9 @@
 import "virtual:uno.css";
 
-import { ApexChartProps, SolidApexCharts } from 'solid-apexcharts';
-import { createSignal, onMount } from 'solid-js'
+import { ApexChartProps, SolidApexCharts } from "solid-apexcharts";
+import { createSignal, onMount } from "solid-js";
 import prettyBytes from "pretty-bytes";
+import Tables from "./Tables";
 
 const colors = [
   "#0ea5e9",
@@ -11,7 +12,7 @@ const colors = [
   "#d946ef",
   "#be185d",
   "#22c55e",
-  "#f59e0b"
+  "#f59e0b",
 ].reverse();
 
 const chartOptions: ApexChartProps["options"]["chart"] = {
@@ -20,12 +21,12 @@ const chartOptions: ApexChartProps["options"]["chart"] = {
     enabled: false,
   },
   toolbar: {
-    show: false
+    show: false,
   },
   zoom: {
-    enabled: false
+    enabled: false,
   },
-}
+};
 
 const xaxisOptions: ApexChartProps["options"]["xaxis"] = {
   axisBorder: {
@@ -34,10 +35,10 @@ const xaxisOptions: ApexChartProps["options"]["xaxis"] = {
   type: "datetime",
   labels: {
     style: {
-      colors: "white"
+      colors: "white",
     },
-  }
-}
+  },
+};
 
 const baseOptions: ApexChartProps["options"] = {
   grid: {
@@ -47,53 +48,58 @@ const baseOptions: ApexChartProps["options"] = {
     enabled: false,
   },
   dataLabels: {
-    enabled: false
+    enabled: false,
   },
   legend: {
     position: "top",
-    horizontalAlign: 'right',
+    horizontalAlign: "right",
     labels: {
-      colors: "white"
-    }
-  }
-}
+      colors: "white",
+    },
+  },
+};
 
-function LineChart(props: { alwaysShowLegend?: boolean, yFormatter?: (x: any) => string; title: string, series: { name: string, data: { x: number, y: number }[] }[] }) {
-  const options = () => ({
-    ...baseOptions,
-    title: {
-      text: props.title,
-      style: {
-        color: "white"
-      }
-    },
-    stroke: {
-      width: 2,
-      curve: "straight",
-    },
-    legend: {
-      ...baseOptions.legend,
-      showForSingleSeries: props.alwaysShowLegend,
-    },
-    chart: {
-      ...chartOptions,
-    },
-    xaxis: {
-      ...xaxisOptions,
-    },
-    yaxis: {
-      axisBorder: {
-        show: true,
-      },
-      labels: {
+function LineChart(props: {
+  alwaysShowLegend?: boolean;
+  yFormatter?: (x: any) => string;
+  title: string;
+  series: { name: string; data: { x: number; y: number }[] }[];
+}) {
+  const options = () =>
+    ({
+      ...baseOptions,
+      title: {
+        text: props.title,
         style: {
-          colors: "white"
+          color: "white",
         },
-        formatter: props.yFormatter,
       },
-
-    },
-  } satisfies ApexChartProps["options"]);
+      stroke: {
+        width: 2,
+        curve: "straight",
+      },
+      legend: {
+        ...baseOptions.legend,
+        showForSingleSeries: props.alwaysShowLegend,
+      },
+      chart: {
+        ...chartOptions,
+      },
+      xaxis: {
+        ...xaxisOptions,
+      },
+      yaxis: {
+        axisBorder: {
+          show: true,
+        },
+        labels: {
+          style: {
+            colors: "white",
+          },
+          formatter: props.yFormatter,
+        },
+      },
+    } satisfies ApexChartProps["options"]);
 
   const theseColors = [...colors];
 
@@ -107,63 +113,69 @@ function LineChart(props: { alwaysShowLegend?: boolean, yFormatter?: (x: any) =>
             y,
           })),
           color: theseColors.pop() ?? "#3b82f6",
-        } satisfies ApexAxisChartSeries[0]
+        } satisfies ApexAxisChartSeries[0];
       }),
-    ] satisfies ApexAxisChartSeries
+    ] satisfies ApexAxisChartSeries,
   });
 
-  return <SolidApexCharts
-    type="line"
-    width="100%"
-    options={options()}
-    series={series().list}
-  />
+  return (
+    <SolidApexCharts
+      type="line"
+      width="100%"
+      options={options()}
+      series={series().list}
+    />
+  );
 }
 
-
-function StackedAreaChart(props: { yFormatter: (x: any) => string; title: string, series: { name: string, data: { x: number, y: number }[] }[] }) {
-  const options = () => ({
-    ...baseOptions,
-    title: {
-      text: props.title,
-      style: {
-        color: "white"
-      }
-    },
-    legend: {
-      ...baseOptions.legend,
-      showForSingleSeries: true,
-    },
-    stroke: {
-      width: 2,
-      curve: "straight",
-    },
-    chart: {
-      ...chartOptions,
-      stacked: true,
-    },
-    fill: {
-      gradient: {
-        opacityFrom: 1,
-        opacityTo: 1,
-        shadeIntensity: 0,
-      }
-    },
-    xaxis: {
-      ...xaxisOptions,
-    },
-    yaxis: {
-      axisBorder: {
-        show: true,
-      },
-      labels: {
+function StackedAreaChart(props: {
+  yFormatter: (x: any) => string;
+  title: string;
+  series: { name: string; data: { x: number; y: number }[] }[];
+}) {
+  const options = () =>
+    ({
+      ...baseOptions,
+      title: {
+        text: props.title,
         style: {
-          colors: "white"
+          color: "white",
         },
-        formatter: props.yFormatter,
       },
-    },
-  } satisfies ApexChartProps["options"]);
+      legend: {
+        ...baseOptions.legend,
+        showForSingleSeries: true,
+      },
+      stroke: {
+        width: 2,
+        curve: "straight",
+      },
+      chart: {
+        ...chartOptions,
+        stacked: true,
+      },
+      fill: {
+        gradient: {
+          opacityFrom: 1,
+          opacityTo: 1,
+          shadeIntensity: 0,
+        },
+      },
+      xaxis: {
+        ...xaxisOptions,
+      },
+      yaxis: {
+        axisBorder: {
+          show: true,
+        },
+        labels: {
+          style: {
+            colors: "white",
+          },
+          formatter: props.yFormatter,
+        },
+      },
+    } satisfies ApexChartProps["options"]);
 
   const theseColors = [...colors];
 
@@ -182,73 +194,100 @@ function StackedAreaChart(props: { yFormatter: (x: any) => string; title: string
             strokeColor: color,
           })),
           color: color,
-        } satisfies ApexAxisChartSeries[0]
+        } satisfies ApexAxisChartSeries[0];
       }),
-    ] satisfies ApexAxisChartSeries
+    ] satisfies ApexAxisChartSeries,
   });
 
-  return <SolidApexCharts
-    type="area"
-    width="100%"
-    options={options()}
-    series={series().list}
-  />
+  return (
+    <SolidApexCharts
+      type="area"
+      width="100%"
+      options={options()}
+      series={series().list}
+    />
+  );
 }
 
 function extractTimeseries(tableStatsMap: any, name: string) {
-  return Object.entries<any>(tableStatsMap).map(([tableName, rows]) => ({
-    name: tableName,
-    data: (rows.find(r => r.row_key === name)?.columns.value[""] ?? []).map(({ timestamp, value: { F64: bytes } }) => ({
-      x: new Date(timestamp / 1000 / 1000),
-      y: bytes,
+  return Object.entries<any>(tableStatsMap)
+    .map(([tableName, rows]) => ({
+      name: tableName,
+      data: (rows.find((r) => r.row_key === name)?.columns.value[""] ?? []).map(
+        ({ time, value: bytes }) => ({
+          x: new Date(time / 1000 / 1000),
+          y: bytes,
+        })
+      ),
     }))
-  })).filter(({ data }) => data.length > 0)
+    .filter(({ data }) => data.length > 0);
 }
 
 function App() {
-  const [sysRows, _] = createSignal(JSON.parse(document.getElementById("system-metrics-data")!.textContent!));
-  const [tableStatsMap, __] = createSignal(JSON.parse(document.getElementById("table-stats-data")!.textContent!));
+  const [sysRows, _] = createSignal(
+    JSON.parse(document.getElementById("system-metrics-data")?.textContent!)
+  );
+  const [tableStatsMap, __] = createSignal(
+    JSON.parse(document.getElementById("table-stats-data")?.textContent!)
+  );
 
-  const cpu = () => (sysRows().find(x => x.row_key === "sys#cpu")?.columns.value[""] ?? []).map(({ timestamp, value: { F64: pct } }) => ({
-    x: new Date(timestamp / 1000 / 1000),
-    y: pct,
-  }));
+  const cpu = () =>
+    (
+      sysRows().find((x) => x.row_key === "sys#cpu")?.columns.value[""] ?? []
+    ).map(({ time, value: { value: pct } }) => ({
+      x: new Date(time / 1000 / 1000),
+      y: pct,
+    }));
 
-  const mem = () => (sysRows().find(x => x.row_key === "sys#mem")?.columns.value[""] ?? []).map(({ timestamp, value: { F64: bytes } }) => ({
-    x: new Date(timestamp / 1000 / 1000),
-    y: bytes,
-  }));
+  const mem = () =>
+    (
+      sysRows().find((x) => x.row_key === "sys#mem")?.columns.value[""] ?? []
+    ).map(({ time, value: bytes }) => ({
+      x: new Date(time / 1000 / 1000),
+      y: bytes,
+    }));
 
-  const writeBufferSize = () => (sysRows().find(x => x.row_key === "wbuf#size")?.columns.value[""] ?? []).map(({ timestamp, value: { F64: bytes } }) => ({
-    x: new Date(timestamp / 1000 / 1000),
-    y: bytes,
-  }));
+  const writeBufferSize = () =>
+    (
+      sysRows().find((x) => x.row_key === "wbuf#size")?.columns.value[""] ?? []
+    ).map(({ time, value: bytes }) => ({
+      x: new Date(time / 1000 / 1000),
+      y: bytes,
+    }));
 
-  const journalCount = () => (sysRows().find(x => x.row_key === "wal#len")?.columns.value[""] ?? []).map(({ timestamp, value: { F64, Byte } }) => ({
-    x: new Date(timestamp / 1000 / 1000),
-    y: Byte ?? F64, // NOTE: Byte has changed to F64
-  }));
+  const journalCount = () =>
+    (
+      sysRows().find((x) => x.row_key === "wal#len")?.columns.value[""] ?? []
+    ).map(({ time, value: { F64, Byte } }) => ({
+      x: new Date(time / 1000 / 1000),
+      y: Byte ?? F64, // NOTE: Byte has changed to F64
+    }));
 
-  const writeLatency = () => extractTimeseries(tableStatsMap(), "lat#write#batch");
-  const cellWriteLatency = () => extractTimeseries(tableStatsMap(), "lat#write#cell");
-  const rowReadLatency = () => extractTimeseries(tableStatsMap(), "lat#read#row");
-  const prefixLatency = () => extractTimeseries(tableStatsMap(), "lat#read#pfx");
-  const rowDeleteLatency = () => extractTimeseries(tableStatsMap(), "lat#del#row");
+  const writeLatency = () =>
+    extractTimeseries(tableStatsMap(), "lat#write#batch");
+  const cellWriteLatency = () =>
+    extractTimeseries(tableStatsMap(), "lat#write#cell");
+  const rowReadLatency = () =>
+    extractTimeseries(tableStatsMap(), "lat#read#row");
+  const prefixLatency = () =>
+    extractTimeseries(tableStatsMap(), "lat#read#pfx");
+  const rowDeleteLatency = () =>
+    extractTimeseries(tableStatsMap(), "lat#del#row");
   const diskUsage = () => extractTimeseries(tableStatsMap(), "stats#du");
-  const segmentCount = () => extractTimeseries(tableStatsMap(), "stats#seg_cnt");
+  const segmentCount = () =>
+    extractTimeseries(tableStatsMap(), "stats#seg_cnt");
   const rowCount = () => extractTimeseries(tableStatsMap(), "stats#row_cnt");
   const cellCount = () => extractTimeseries(tableStatsMap(), "stats#cell_cnt");
   const gcDeleteCount = () => extractTimeseries(tableStatsMap(), "gc#del_cnt");
 
   onMount(() => {
-    setTimeout(() => window.location.reload(), 60 * 1000)
+    setTimeout(() => window.location.reload(), 60 * 1000);
   });
 
   return (
     <div class="flex flex-col gap-10 mx-auto max-w-3xl">
-      <div class="text-center text-xl text-white">
-        Smoltable
-      </div>
+      <div class="text-center text-xl text-white">Smoltable</div>
+      <Tables />
       <div class="grid sm:grid-cols-2 gap-3">
         <LineChart
           title="CPU usage (system)"
@@ -257,7 +296,7 @@ function App() {
             {
               name: "CPU",
               data: cpu(),
-            }
+            },
           ]}
         />
         <LineChart
@@ -267,7 +306,7 @@ function App() {
             {
               name: "Mem",
               data: mem(),
-            }
+            },
           ]}
         />
         <LineChart
@@ -277,170 +316,150 @@ function App() {
             {
               name: "Write buffer size",
               data: writeBufferSize(),
-            }
+            },
           ]}
         />
         <LineChart
           title="Journals count"
-          yFormatter={x => Math.floor(x).toString()}
+          yFormatter={(x) => Math.floor(x).toString()}
           series={[
             {
               name: "# journals",
               data: journalCount(),
-            }
+            },
           ]}
         />
         <StackedAreaChart
           title="Disk usage"
           yFormatter={prettyBytes}
-          series={[
-            ...diskUsage(),
-          ]}
+          series={[...diskUsage()]}
         />
         <LineChart
           title="Disk segments count"
-          yFormatter={x => {
+          yFormatter={(x) => {
             if (x < 1_000) {
               return x;
             }
             if (x < 1_000_000) {
-              return `${(x / 1_000)}k`;
+              return `${x / 1_000}k`;
             }
-            return `${(x / 1_000 / 1_000)}M`;
+            return `${x / 1_000 / 1_000}M`;
           }}
-          series={[
-            ...segmentCount(),
-          ]}
+          series={[...segmentCount()]}
         />
         <LineChart
           title="Row count"
-          yFormatter={x => {
+          yFormatter={(x) => {
             if (x < 1_000) {
               return x;
             }
             if (x < 1_000_000) {
-              return `${(x / 1_000)}k`;
+              return `${x / 1_000}k`;
             }
-            return `${(x / 1_000 / 1_000)}M`;
+            return `${x / 1_000 / 1_000}M`;
           }}
-          series={[
-            ...rowCount(),
-          ]}
+          series={[...rowCount()]}
         />
         <LineChart
           title="Cell count"
-          yFormatter={x => {
+          yFormatter={(x) => {
             if (x < 1_000) {
               return x;
             }
             if (x < 1_000_000) {
-              return `${(x / 1_000)}k`;
+              return `${x / 1_000}k`;
             }
-            return `${(x / 1_000 / 1_000)}M`;
+            return `${x / 1_000 / 1_000}M`;
           }}
-          series={[
-            ...cellCount(),
-          ]}
+          series={[...cellCount()]}
         />
         <LineChart
           alwaysShowLegend
           title="Write latency"
-          yFormatter={x => {
+          yFormatter={(x) => {
             if (x < 1_000) {
-              return `${x} µs`
+              return `${x} µs`;
             }
             if (x < 1_000_000) {
-              return `${(x / 1000).toFixed(2)} ms`
+              return `${(x / 1000).toFixed(2)} ms`;
             }
-            return `${(x / 1000 / 1000).toFixed(2)} s`
+            return `${(x / 1000 / 1000).toFixed(2)} s`;
           }}
-          series={[
-            ...writeLatency(),
-          ]}
+          series={[...writeLatency()]}
         />
         <LineChart
           alwaysShowLegend
           title="Cell write latency"
-          yFormatter={x => {
+          yFormatter={(x) => {
             if (x < 1_000) {
-              return `${x} µs`
+              return `${x} µs`;
             }
             if (x < 1_000_000) {
-              return `${(x / 1000).toFixed(2)} ms`
+              return `${(x / 1000).toFixed(2)} ms`;
             }
-            return `${(x / 1000 / 1000).toFixed(2)} s`
+            return `${(x / 1000 / 1000).toFixed(2)} s`;
           }}
-          series={[
-            ...cellWriteLatency(),
-          ]}
+          series={[...cellWriteLatency()]}
         />
         <LineChart
           alwaysShowLegend
           title="Row read latency"
-          yFormatter={x => {
+          yFormatter={(x) => {
             if (x < 1_000) {
-              return `${x} µs`
+              return `${x} µs`;
             }
             if (x < 1_000_000) {
-              return `${(x / 1000).toFixed(2)} ms`
+              return `${(x / 1000).toFixed(2)} ms`;
             }
-            return `${(x / 1000 / 1000).toFixed(2)} s`
+            return `${(x / 1000 / 1000).toFixed(2)} s`;
           }}
-          series={[
-            ...rowReadLatency(),
-          ]}
+          series={[...rowReadLatency()]}
         />
         <LineChart
           alwaysShowLegend
           title="Prefix scan latency"
-          yFormatter={x => {
+          yFormatter={(x) => {
             if (x < 1_000) {
-              return `${x} µs`
+              return `${x} µs`;
             }
             if (x < 1_000_000) {
-              return `${(x / 1000).toFixed(2)} ms`
+              return `${(x / 1000).toFixed(2)} ms`;
             }
-            return `${(x / 1000 / 1000).toFixed(2)} s`
+            return `${(x / 1000 / 1000).toFixed(2)} s`;
           }}
-          series={[
-            ...prefixLatency(),
-          ]}
+          series={[...prefixLatency()]}
         />
         <LineChart
           alwaysShowLegend
           title="Delete row latency"
-          yFormatter={x => {
+          yFormatter={(x) => {
             if (x < 1_000) {
-              return `${x} µs`
+              return `${x} µs`;
             }
             if (x < 1_000_000) {
-              return `${(x / 1000).toFixed(2)} ms`
+              return `${(x / 1000).toFixed(2)} ms`;
             }
-            return `${(x / 1000 / 1000).toFixed(2)} s`
+            return `${(x / 1000 / 1000).toFixed(2)} s`;
           }}
-          series={[
-            ...rowDeleteLatency(),
-          ]}
+          series={[...rowDeleteLatency()]}
         />
         <LineChart
           alwaysShowLegend
           title="Cell GC delete count"
-          yFormatter={x => {
+          yFormatter={(x) => {
             if (x < 1_000) {
               return x;
             }
             if (x < 1_000_000) {
-              return `${(x / 1_000)}k`;
+              return `${x / 1_000}k`;
             }
-            return `${(x / 1_000 / 1_000)}M`;
+            return `${x / 1_000 / 1_000}M`;
           }}
-          series={[
-            ...gcDeleteCount(),
-          ]}
+          series={[...gcDeleteCount()]}
         />
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
