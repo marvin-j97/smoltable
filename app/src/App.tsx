@@ -3,7 +3,6 @@ import "virtual:uno.css";
 import { ApexChartProps, SolidApexCharts } from "solid-apexcharts";
 import { createSignal, onMount } from "solid-js";
 import prettyBytes from "pretty-bytes";
-import Tables from "./Tables";
 
 const colors = [
   "#0ea5e9",
@@ -287,7 +286,6 @@ function App() {
   return (
     <div class="flex flex-col gap-10 mx-auto max-w-3xl">
       <div class="text-center text-xl text-white">Smoltable</div>
-      <Tables />
       <div class="grid sm:grid-cols-2 gap-3">
         <LineChart
           title="CPU usage (system)"
