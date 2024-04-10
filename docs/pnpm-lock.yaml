@@ -7,19 +7,19 @@ settings:
 dependencies:
   '@astrojs/check':
     specifier: 0.4.1
-    version: 0.4.1(typescript@5.3.3)
+    version: 0.4.1(typescript@5.4.5)
   '@astrojs/starlight':
     specifier: 0.17.0
     version: 0.17.0(astro@4.2.1)
   astro:
     specifier: 4.2.1
-    version: 4.2.1(typescript@5.3.3)
+    version: 4.2.1(typescript@5.4.5)
   sharp:
     specifier: 0.33.0
     version: 0.33.0
   typescript:
-    specifier: 5.3.3
-    version: 5.3.3
+    specifier: 5.4.5
+    version: 5.4.5
 
 packages:
 
@@ -31,17 +31,17 @@ packages:
       '@jridgewell/trace-mapping': 0.3.22
     dev: false
 
-  /@astrojs/check@0.4.1(typescript@5.3.3):
+  /@astrojs/check@0.4.1(typescript@5.4.5):
     resolution: {integrity: sha512-XEsuU4TlWkgcsvdeessq5mXLXV1fejtxIioCPv/FfhTzb1bDYe2BtLiSBK+rFTyD9Hl686YOas9AGNMJcpoRsw==}
     hasBin: true
     peerDependencies:
       typescript: ^5.0.0
     dependencies:
-      '@astrojs/language-server': 2.6.2(typescript@5.3.3)
+      '@astrojs/language-server': 2.6.2(typescript@5.4.5)
       chokidar: 3.5.3
       fast-glob: 3.3.2
       kleur: 4.1.5
-      typescript: 5.3.3
+      typescript: 5.4.5
       yargs: 17.7.2
     transitivePeerDependencies:
       - prettier
@@ -56,7 +56,7 @@ packages:
     resolution: {integrity: sha512-06DD2ZnItMwUnH81LBLco3tWjcZ1lGU9rLCCBaeUCGYe9cI0wKyY2W3kDyoW1I6GmcWgt1fu+D1CTvz+FIKf8A==}
     dev: false
 
-  /@astrojs/language-server@2.6.2(typescript@5.3.3):
+  /@astrojs/language-server@2.6.2(typescript@5.4.5):
     resolution: {integrity: sha512-RYzPRhS/WBXK5JtfR+0+nGj+N3VbJd5jU/uSNUev9baUx/RLmUwDk1f6Oy8QDEfDDLAr76Ig8YeDD/nxPdBSLw==}
     hasBin: true
     peerDependencies:
@@ -70,7 +70,7 @@ packages:
     dependencies:
       '@astrojs/compiler': 2.5.1
       '@jridgewell/sourcemap-codec': 1.4.15
-      '@volar/kit': 1.11.1(typescript@5.3.3)
+      '@volar/kit': 1.11.1(typescript@5.4.5)
       '@volar/language-core': 1.11.1
       '@volar/language-server': 1.11.1
       '@volar/language-service': 1.11.1
@@ -141,7 +141,7 @@ packages:
       '@astrojs/markdown-remark': 4.2.0
       '@mdx-js/mdx': 3.0.0
       acorn: 8.11.3
-      astro: 4.2.1(typescript@5.3.3)
+      astro: 4.2.1(typescript@5.4.5)
       es-module-lexer: 1.4.1
       estree-util-visit: 2.0.0
       github-slugger: 2.0.0
@@ -182,7 +182,7 @@ packages:
       '@pagefind/default-ui': 1.0.4
       '@types/hast': 3.0.3
       '@types/mdast': 4.0.3
-      astro: 4.2.1(typescript@5.3.3)
+      astro: 4.2.1(typescript@5.4.5)
       astro-expressive-code: 0.32.3(astro@4.2.1)
       bcp-47: 2.1.0
       hast-util-select: 6.0.2
@@ -1235,14 +1235,14 @@ packages:
     resolution: {integrity: sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==}
     dev: false
 
-  /@volar/kit@1.11.1(typescript@5.3.3):
+  /@volar/kit@1.11.1(typescript@5.4.5):
     resolution: {integrity: sha512-nqO+Hl9f1ygOK/3M7Hpnw0lhKvuMFhh823nilStpkTmm5WfrUnE+4WaQkb3dC6LM3TZq74j2m88yxRC+Z3sZZw==}
     peerDependencies:
       typescript: '*'
     dependencies:
       '@volar/language-service': 1.11.1
       typesafe-path: 0.2.2
-      typescript: 5.3.3
+      typescript: 5.4.5
       vscode-languageserver-textdocument: 1.0.11
       vscode-uri: 3.0.8
     dev: false
@@ -1400,12 +1400,12 @@ packages:
     peerDependencies:
       astro: ^3.3.0 || ^4.0.0-beta
     dependencies:
-      astro: 4.2.1(typescript@5.3.3)
+      astro: 4.2.1(typescript@5.4.5)
       hast-util-to-html: 8.0.4
       remark-expressive-code: 0.32.3
     dev: false
 
-  /astro@4.2.1(typescript@5.3.3):
+  /astro@4.2.1(typescript@5.4.5):
     resolution: {integrity: sha512-TcrveW2/lohmljrbTUgcDxajEdF1yK+zBvb7SXroloGix/d4jkegO6GANFgvyy0zprMyajW7qgJEFyhWUX86Vw==}
     engines: {node: '>=18.14.1', npm: '>=6.14.0'}
     hasBin: true
@@ -1465,7 +1465,7 @@ packages:
       shikiji: 0.9.19
       string-width: 7.1.0
       strip-ansi: 7.1.0
-      tsconfck: 3.0.1(typescript@5.3.3)
+      tsconfck: 3.0.1(typescript@5.4.5)
       unist-util-visit: 5.0.0
       vfile: 6.0.1
       vite: 5.0.12
@@ -4360,7 +4360,7 @@ packages:
     resolution: {integrity: sha512-AqTiAOLcj85xS7vQ8QkAV41hPDIJ71XJB4RCUrzo/1GM2CQwhkJGaf9Hgr7BOugMRpgGUrqRg/DrBDl4H40+8g==}
     dev: false
 
-  /tsconfck@3.0.1(typescript@5.3.3):
+  /tsconfck@3.0.1(typescript@5.4.5):
     resolution: {integrity: sha512-7ppiBlF3UEddCLeI1JRx5m2Ryq+xk4JrZuq4EuYXykipebaq1dV0Fhgr1hb7CkmHt32QSgOZlcqVLEtHBG4/mg==}
     engines: {node: ^18 || >=20}
     hasBin: true
@@ -4370,7 +4370,7 @@ packages:
       typescript:
         optional: true
     dependencies:
-      typescript: 5.3.3
+      typescript: 5.4.5
     dev: false
 
   /tslib@2.6.2:
@@ -4402,8 +4402,8 @@ packages:
       semver: 7.5.4
     dev: false
 
-  /typescript@5.3.3:
-    resolution: {integrity: sha512-pXWcraxM0uxAS+tN0AG/BF2TyqmHO014Z070UsJ+pFvYuRSq8KH8DmWpnbXe0pEPDHXZV3FcAbJkijJ5oNEnWw==}
+  /typescript@5.4.5:
+    resolution: {integrity: sha512-vcI4UpRgg81oIRUFwR0WSIHKt11nJ7SAVlYNIu+QpqeyXP+gpQJy/Z4+F0aGxSE4MqwjyXvW/TzgkLAx2AGHwQ==}
     engines: {node: '>=14.17'}
     hasBin: true
     dev: false
