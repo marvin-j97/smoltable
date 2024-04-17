@@ -25,7 +25,7 @@ pub struct ColumnKey {
 impl ColumnKey {
     pub fn build_key(&self, row_key: &str) -> String {
         match &self.qualifier {
-            Some(cq) => format!("{row_key}:{}:{}:", self.family, cq),
+            Some(cq) => format!("{row_key}:{}:{cq}:", self.family),
             None => format!("{row_key}:{}:", self.family),
         }
     }
