@@ -187,6 +187,8 @@ POST http://smoltable:9876/v1/table/[name]/scan
 }
 ```
 
+<!-- TODO: scan backwards -->
+
 <!-- TODO: -->
 <!-- ### Limit returned columns
 

@@ -10,7 +10,7 @@ A column key consists of two **case-sensitive** components, separated by `:` (co
 
 Columns are grouped under column families. To access a column, use the family's name and a column qualifier. For instance, to access the column `size` inside the `meta` column family, the column key would be `meta:size`.
 
-:::caution
+:::note
 Column qualifiers in Bigtable can be arbitrary byte arrays. In Smoltable, they need to be valid UTF-8 strings.
 :::
 

@@ -114,19 +114,22 @@ The same goes for column qualifiers: Inside a column family, one could group col
 using a prefix column filter. This only works when accessing a column family of a single row (read row operation), not in a scan operation.
 :::
 
-## Data retention
+### Customizing sorting behaviour
 
-Each _column family_'s data retention can be configured using two garbage collection (GC) mechanisms:
+By using a multi-component date or a fixed-length integer, data can be sorted.
 
-- TTL
-- Version limit
+Using the above example, by adding a `YYYY-MM-DD` component to the row key, we can sort flights _per_ plane in ascending order:
 
-These allow you to delete cells that are (1) too old, or (2) have too many versions stored, to reduce storage costs. Both GC mechanisms are disabled by default.
+| row key                         | loc\:start | loc\:dest | meta\:miles | meta\:model     | meta\:operator |
+| ------------------------------- | ---------- | --------- | ----------- | --------------- | -------------- |
+| plane#TF-FIR                    |            |           | 51000000    | Boeing 757-256  | Icelandair     |
+| plane#D-AIQN                    |            |           | 52142142    | Airbus A320-211 | Germanwings    |
+| flight#TF-FIR#2024-01-25#FI318  | KEF        | OSL       |             |                 |                |
+| flight#TF-FIR#2024-01-25#FI319  | OSL        | KEF       |             |                 |                |
+| flight#D-AIQN#2019-10-31#EW7033 | CGN        | HAM       |             |                 |                |
+| flight#D-AIQN#2019-10-31#EW7036 | HAM        | CGN       |             |                 |                |
 
-:::caution
-Garbage collection happens asynchronously and lazily, so data may live longer than the defined
-limits.
-:::
+Now, using a scan with prefix `flight#TF-FIR#2024-01-` we can get all flights of `TF-FIR` in January 2024.
 
 ## Real-life example: Webtable
 
