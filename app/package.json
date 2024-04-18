@@ -12,7 +12,7 @@
     "pretty-bytes": "6.1.1",
     "solid-apexcharts": "0.3.4",
     "solid-js": "1.8.16",
-    "unocss": "0.58.5"
+    "unocss": "0.59.4"
   },
   "devDependencies": {
     "typescript": "5.4.5",
