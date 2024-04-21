@@ -84,6 +84,13 @@ pub struct GarbageCollectionOptions {
     pub ttl_secs: Option<u64>,
 }
 
+impl GarbageCollectionOptions {
+    /// Returns `true` if some GC is defined
+    pub fn needs_gc(&self) -> bool {
+        self.version_limit.is_some() || self.ttl_secs.is_some()
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ColumnFamilyDefinition {
     pub name: String,
@@ -373,9 +380,9 @@ impl Smoltable {
             .map(|x| (x.name, x.gc_settings))
             .collect::<HashMap<_, _>>();
 
-        if gc_options_map
-            .iter()
-            .all(|(_, x)| x.ttl_secs.is_none() && x.version_limit.is_none())
+        if !gc_options_map
+            .values()
+            .any(GarbageCollectionOptions::needs_gc)
         {
             // NOTE: Short circuit because no GC defined for any column family
             log::info!("{} has no column families with GC, skipping", self.name);
