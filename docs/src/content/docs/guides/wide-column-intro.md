@@ -167,7 +167,7 @@ This is a summary based on parts of Bigtable's documentation that apply to Smolt
 
 - Put related columns in the same column family
 - Choose short names for your column families
-- Put columns that have different data retention needs in different column families
+- Put columns that have different [data retention](/smoltable/guides/data-retention) needs in different column families
 
 ### Columns
 

@@ -46,6 +46,8 @@ POST http://smoltable:9876/v1/table/[name]/column-family
 }
 ```
 
+You may create and group multiple column families into a [locality group](/smoltable/guides/locality-groups). However, the column families can not be created upfront and then moved into a locality group.
+
 ## Configure garbage collection
 
 ```json
@@ -61,6 +63,8 @@ POST http://smoltable:9876/v1/table/[name]/column-family
   ]
 }
 ```
+
+See the chapter [Data Retention](/smoltable/guides/data-retention) for more information about garbage collection.
 
 ### Parameters
 
