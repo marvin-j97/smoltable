@@ -35,18 +35,18 @@ Group column families into the same locality group if they are accessed together
 
 ### Setup
 
-First, let's create a table `scan-example`:
+First, let's create a table `no-locality-example`:
 
 ```bash
 curl --request PUT \
-  --url http://localhost:9876/v1/table/scan-example
+  --url http://localhost:9876/v1/table/no-locality-example
 ```
 
 and two column families, `title` and `language`:
 
 ```bash
 curl --request POST \
-  --url http://localhost:9876/v1/table/scan-example/column-family \
+  --url http://localhost:9876/v1/table/no-locality-example/column-family \
   --header 'content-type: application/json' \
   --data '{
   "column_families": [
@@ -66,6 +66,10 @@ By listing our table, we can see the column families have been created and are n
 {
   "message": "Tables retrieved successfully",
   "result": {
+    "cache_stats": {
+      "block_count": 0,
+      "memory_usage_in_bytes": 0
+    },
     "tables": {
       "count": 1,
       "items": [
@@ -88,15 +92,15 @@ By listing our table, we can see the column families have been created and are n
           ],
           "disk_space_in_bytes": 0,
           "locality_groups": [],
-          "name": "scan-example",
+          "name": "no-locality-example",
           "partitions": [
             {
-              "name": "_man_scan-example",
-              "path": ".smoltable_data/partitions/_man_scan-example"
+              "name": "_man_no-locality-example",
+              "path": "/smoltable/.smoltable_data/partitions/_man_no-locality-example"
             },
             {
-              "name": "_dat_scan-example",
-              "path": ".smoltable_data/partitions/_dat_scan-example"
+              "name": "_dat_no-locality-example",
+              "path": "/smoltable/.smoltable_data/partitions/_dat_no-locality-example"
             }
           ]
         }
@@ -108,7 +112,7 @@ By listing our table, we can see the column families have been created and are n
 }
 ```
 
-All data is stored in the `_dat_scan-example` partition.
+All data is stored in the `_dat_no-locality-example` partition.
 
 ### Ingest data
 
@@ -116,7 +120,7 @@ Let's ingest some data and query it (body is truncated for brevity):
 
 ```bash
 curl --request POST \
-  --url http://localhost:9876/v1/table/scan-example/write \
+  --url http://localhost:9876/v1/table/no-locality-example/write \
   --header 'content-type: application/json' \
   --data '{
   "items": [
@@ -135,21 +139,7 @@ curl --request POST \
         }
       ]
     },
-    {
-      "row_key": "org.apache.solr",
-      "cells": [
-        {
-          "column_key": "title:",
-          "type": "string",
-          "value": "Welcome to Apache Solr - Apache Solr"
-        },
-        {
-          "column_key": "language:",
-          "type": "string",
-          "value": "EN"
-        }
-      ]
-    }
+    // snip
   ]
 }'
 ```
@@ -161,7 +151,7 @@ only return the column `title:`:
 
 ```bash
 curl --request POST \
-  --url http://localhost:9876/v1/table/scan-example/scan \
+  --url http://localhost:9876/v1/table/no-locality-example/scan \
   --header 'content-type: application/json' \
   --data '{
 	"row": {
@@ -179,27 +169,14 @@ Smoltable returns (again, body truncated for brevity):
 {
   "message": "Query successful",
   "result": {
-    "affected_locality_groups": 2,
-    "bytes_scanned": 1141,
+    "affected_locality_groups": 1,
+    "bytes_scanned": 984,
     "cell_count": 8,
     "cells_scanned": 16,
-    "micros_per_row": 18,
+    "micros_per_row": 17,
     "row_count": 8,
     "rows": [
-      {
-        "columns": {
-          "title": {
-            "": [
-              {
-                "time": 1706197595375136143,
-                "type": "string",
-                "value": "Apache Cassandra | Apache Cassandra Documentation"
-              }
-            ]
-          }
-        },
-        "row_key": "org.apache.cassandra"
-      }
+      // snip
     ],
     "rows_scanned": 8
   },
@@ -210,22 +187,24 @@ Smoltable returns (again, body truncated for brevity):
 
 Note, how we scanned 1 KB of data, and 16 cells, but only returned 8 cells (because we filtered by the `title` column family). That means we have a read amplification of about `2`.
 
+[Download example script](https://raw.githubusercontent.com/marvin-j97/smoltable/main/docs/public/scripts/example-no-locality.sh)
+
 ## Example: With locality groups
 
 ### Setup
 
-First, let's create a table `locality-example`:
+First, let's create a table `with-locality-example`:
 
 ```bash
 curl --request PUT \
-  --url http://localhost:9876/v1/table/locality-example
+  --url http://localhost:9876/v1/table/with-locality-example
 ```
 
 and two column families, `title` and `language`, but move `title` into a locality group:
 
 ```bash
 curl --request POST \
-  --url http://localhost:9876/v1/table/locality-example/column-family \
+  --url http://localhost:9876/v1/table/with-locality-example/column-family \
   --header 'content-type: application/json' \
   --data '{
   "column_families": [
@@ -238,7 +217,7 @@ curl --request POST \
 
 ```bash
 curl --request POST \
-  --url http://localhost:9876/v1/table/locality-example/column-family \
+  --url http://localhost:9876/v1/table/with-locality-example/column-family \
   --header 'content-type: application/json' \
   --data '{
   "column_families": [
@@ -256,6 +235,10 @@ By listing our table, we can see the column families have been created, and `tit
 {
   "message": "Tables retrieved successfully",
   "result": {
+    "cache_stats": {
+      "block_count": 0,
+      "memory_usage_in_bytes": 0
+    },
     "tables": {
       "count": 1,
       "items": [
@@ -279,23 +262,25 @@ By listing our table, we can see the column families have been created, and `tit
           "disk_space_in_bytes": 0,
           "locality_groups": [
             {
-              "column_families": ["title"],
-              "id": "ur_pSQZ2QAYR6XsF9Xz0o"
+              "column_families": [
+                "title"
+              ],
+              "id": "ij0SIQ_z0Ys9Qx_wMWyt6"
             }
           ],
-          "name": "locality-example",
+          "name": "with-locality-example",
           "partitions": [
             {
-              "name": "_man_locality-example",
-              "path": ".smoltable_data/partitions/_man_locality-example"
+              "name": "_man_with-locality-example",
+              "path": "/smoltable/.smoltable_data/partitions/_man_with-locality-example"
             },
             {
-              "name": "_dat_locality-example",
-              "path": ".smoltable_data/partitions/_dat_locality-example"
+              "name": "_dat_with-locality-example",
+              "path": "/smoltable/.smoltable_data/partitions/_dat_with-locality-example"
             },
             {
-              "name": "_lg_ur_pSQZ2QAYR6XsF9Xz0o",
-              "path": ".smoltable_data/partitions/_lg_ur_pSQZ2QAYR6XsF9Xz0o"
+              "name": "_lg_ij0SIQ_z0Ys9Qx_wMWyt6",
+              "path": "/smoltable/.smoltable_data/partitions/_lg_ij0SIQ_z0Ys9Qx_wMWyt6"
             }
           ]
         }
@@ -307,17 +292,17 @@ By listing our table, we can see the column families have been created, and `tit
 }
 ```
 
-Column families that are not `title` are stored in the `_dat_locality-example` partition, and `title` data is moved into the `_lg_ur_pSQZ2QAYR6XsF9Xz0o` partition.
+Column families that are not `title` are stored in the `_dat_with-locality-example` partition, and `title` data is moved into the `_lg_ij0SIQ_z0Ys9Qx_wMWyt6` partition.
 
 ### Ingest data
 
-Ingest the same data as before into `locality-example`.
+Ingest the same data as before into `with-locality-example`.
 
 ### Query data
 
 ```bash
 curl --request POST \
-  --url http://localhost:9876/v1/table/locality-example/scan \
+  --url http://localhost:9876/v1/table/with-locality-example/scan \
   --header 'content-type: application/json' \
   --data '{
 	"row": {
@@ -336,26 +321,13 @@ which returns (truncated):
   "message": "Query successful",
   "result": {
     "affected_locality_groups": 1,
-    "bytes_scanned": 681,
+    "bytes_scanned": 610,
     "cell_count": 8,
     "cells_scanned": 8,
-    "micros_per_row": 18,
+    "micros_per_row": 21,
     "row_count": 8,
     "rows": [
-      {
-        "columns": {
-          "title": {
-            "": [
-              {
-                "time": 1706198298766257607,
-                "type": "string",
-                "value": "Apache Cassandra | Apache Cassandra Documentation"
-              }
-            ]
-          }
-        },
-        "row_key": "org.apache.cassandra"
-      }
+      // snip
     ],
     "rows_scanned": 8
   },
@@ -366,13 +338,15 @@ which returns (truncated):
 
 We get the exact same result, however, we reduced scanned bytes down to 680 bytes, and halved scanned cells, achieving a read amplification of `1`!
 
+[Download example script](https://raw.githubusercontent.com/marvin-j97/smoltable/main/docs/public/scripts/example-with-locality.sh)
+
 ## Example: Scanning another column family
 
 Let's scan the `language` column instead, which is still stored in the default partition.
 
 ```bash
 curl --request POST \
-  --url http://localhost:9876/v1/table/scan-example/scan \
+  --url http://localhost:9876/v1/table/with-locality-example/scan \
   --header 'content-type: application/json' \
   --data '{
   "row": {
@@ -386,7 +360,7 @@ curl --request POST \
 
 ```bash
 curl --request POST \
-  --url http://localhost:9876/v1/table/locality-example/scan \
+  --url http://localhost:9876/v1/table/with-locality-example/scan \
   --header 'content-type: application/json' \
   --data '{
   "row": {
@@ -398,39 +372,17 @@ curl --request POST \
 }'
 ```
 
-`scan_example` (no locality groups) returns:
-
-```json
-{
-  "message": "Query successful",
-  "result": {
-    "affected_locality_groups": 2,
-    "bytes_scanned": 1141,
-    "cell_count": 8,
-    "cells_scanned": 16,
-    "micros_per_row": 11,
-    "row_count": 8,
-    "rows": [
-      // snip
-    ],
-    "rows_scanned": 8
-  },
-  "status": 200,
-  "time_ms": 0
-}
-```
-
-`locality_example` returns:
+`no-locality-example` (no locality groups) returns:
 
 ```json
 {
   "message": "Query successful",
   "result": {
     "affected_locality_groups": 1,
-    "bytes_scanned": 460,
+    "bytes_scanned": 984,
     "cell_count": 8,
-    "cells_scanned": 8,
-    "micros_per_row": 16,
+    "cells_scanned": 16,
+    "micros_per_row": 18,
     "row_count": 8,
     "rows": [
       // snip
@@ -442,4 +394,26 @@ curl --request POST \
 }
 ```
 
-From `1141` bytes down to `460`, that's a **60%** decrease!
+`with-locality-example` returns:
+
+```json
+{
+  "message": "Query successful",
+  "result": {
+    "affected_locality_groups": 1,
+    "bytes_scanned": 374,
+    "cell_count": 8,
+    "cells_scanned": 8,
+    "micros_per_row": 15,
+    "row_count": 8,
+    "rows": [
+      // snip
+    ],
+    "rows_scanned": 8
+  },
+  "status": 200,
+  "time_ms": 0
+}
+```
+
+From `984` bytes down to `374`, that's a **62%** decrease!
