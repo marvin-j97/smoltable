@@ -5,7 +5,7 @@ FROM node:20-alpine AS node-builder
 WORKDIR /app
 
 COPY . .
-RUN cd app && npm ci && npm run build
+RUN npm i -g pnpm && cd app && pnpm i --frozen-lockfile && npm run build
 
 #
 # Rust Build stage
