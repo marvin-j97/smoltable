@@ -9,6 +9,7 @@
 
 [![Documentation](https://img.shields.io/badge/Documentation_here-blue)](https://marvin-j97.github.io/smoltable/)
 [![CI](https://github.com/marvin-j97/smoltable/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/marvin-j97/smoltable/actions/workflows/test.yml)
+![MSRV](https://img.shields.io/badge/MSRV-1.75.0-blue)
 
 Smoltable is a tiny wide-column store heavily inspired by [Google Bigtable](https://static.googleusercontent.com/media/research.google.com/de//archive/bigtable-osdi06.pdf). It is implemented in Rust and is based on a [custom-written LSM storage engine](https://github.com/fjall-rs/fjall), also written in Rust. It can be accessed through a JSON REST API, with potential plans for future embeddability.
 
