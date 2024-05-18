@@ -16,11 +16,11 @@ path = "src/lib.rs"
 
 [dependencies]
 log = { version = "0.4.21" }
-serde = { version = "1.0.198", features = ["derive"] }
+serde = { version = "1.0.198", features = ["derive", "rc"] }
 serde_json = "1.0.116"
 test-log = "0.2.15"
 tempfile = "3.10.1"
 nanoid = "0.4.0"
 
 # NOTE: Don't need bloom filters, because we always do prefix queries for pretty much everything
-fjall = { version = "0.6.3" }
+fjall = { version = "1.0.2" }

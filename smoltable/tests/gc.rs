@@ -138,3 +138,7 @@ pub fn gc_ttl() -> smoltable::Result<()> {
 
     Ok(())
 }
+
+// TODO: check that LG affected = 0, if no GC defined at all
+
+// TODO: test that GC does not overscan LGs that do not need GC

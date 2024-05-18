@@ -179,7 +179,7 @@ impl Smoltable {
     pub fn column_family_count(&self) -> crate::Result<usize> {
         let mut count = 0;
 
-        for item in self.manifest.prefix("cf#").into_iter() {
+        for item in self.manifest.prefix("cf#") {
             let _ = item?;
             count += 1;
         }
@@ -188,12 +188,7 @@ impl Smoltable {
     }
 
     pub fn list_column_families(&self) -> crate::Result<Vec<ColumnFamilyDefinition>> {
-        let items = self
-            .manifest
-            .prefix("cf#")
-            .into_iter()
-            .collect::<Result<Vec<_>, fjall::LsmError>>()
-            .map_err(fjall::Error::from)?;
+        let items = self.manifest.prefix("cf#").collect::<Result<Vec<_>, _>>()?;
 
         let items = items
             .into_iter()
@@ -207,12 +202,7 @@ impl Smoltable {
     }
 
     fn load_locality_groups(&self) -> crate::Result<()> {
-        let items = self
-            .manifest
-            .prefix("lg#")
-            .into_iter()
-            .collect::<Result<Vec<_>, fjall::LsmError>>()
-            .map_err(fjall::Error::from)?;
+        let items = self.manifest.prefix("lg#").collect::<Result<Vec<_>, _>>()?;
 
         let items = items
             .into_iter()
@@ -298,7 +288,7 @@ impl Smoltable {
         }
 
         batch.commit()?;
-        self.keyspace.persist()?;
+        self.keyspace.persist(fjall::FlushMode::SyncAll)?;
 
         self.load_locality_groups()?;
 

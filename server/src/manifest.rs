@@ -43,12 +43,7 @@ impl ManifestTable {
     }
 
     pub fn get_user_table_names(&self) -> smoltable::Result<Vec<String>> {
-        let items = self
-            .tree
-            .iter()
-            .into_iter()
-            .collect::<Result<Vec<_>, fjall::LsmError>>()
-            .map_err(fjall::Error::from)?;
+        let items = self.tree.iter().collect::<Result<Vec<_>, _>>()?;
 
         let names = items
             .into_iter()
@@ -65,13 +60,13 @@ impl ManifestTable {
         self.tree
             .insert(format!("table#{table_name}#name"), table_name)?;
 
-        self.keyspace.persist()?;
+        self.keyspace.persist(fjall::FlushMode::SyncAll)?;
 
         Ok(())
     }
 
     pub fn delete_user_table(&self, table_name: &str) -> smoltable::Result<()> {
-        for item in &self.tree.prefix(format!("table#{table_name}#")) {
+        for item in self.tree.prefix(format!("table#{table_name}#")) {
             let (k, _) = item?;
             self.tree.remove(k)?;
         }

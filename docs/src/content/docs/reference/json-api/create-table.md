@@ -7,8 +7,6 @@ description: Create a table using the JSON API
 
 PUT http://smoltable:9876/v1/table/[name]
 
-<!-- TODO: column families -->
-
 ### Example response
 
 ```json

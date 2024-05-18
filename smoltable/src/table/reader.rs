@@ -61,7 +61,7 @@ impl Reader {
         prefix: &str,
     ) -> fjall::Result<Option<Arc<[u8]>>> {
         let snapshot = locality_group.snapshot_at(instant);
-        let item = snapshot.prefix(prefix.as_bytes()).into_iter().next();
+        let item = snapshot.prefix(prefix.as_bytes()).next();
 
         match item {
             Some(item) => {
@@ -87,7 +87,6 @@ impl Reader {
             let collected = self
                 .snapshot
                 .range((current_range_start.clone(), Unbounded))
-                .into_iter()
                 .take(self.chunk_size)
                 .collect::<Result<Vec<_>, fjall::LsmError>>();
 
