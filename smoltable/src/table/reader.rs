@@ -2,9 +2,12 @@ use crate::VisitedCell;
 use fjall::{PartitionHandle, Snapshot};
 use std::{collections::VecDeque, ops::Bound, sync::Arc};
 
+// TODO: use partition iterator directly (Box dyn)
+
 /// Stupidly iterates through cells
 pub struct Reader {
     pub partition: PartitionHandle,
+
     snapshot: Snapshot,
     current_range_start: Bound<Arc<[u8]>>,
 
@@ -50,9 +53,11 @@ impl Reader {
             return Ok(None);
         };
 
-        let reader = Self::new(instant, locality_group, std::ops::Bound::Included(range));
-
-        Ok(Some(reader))
+        Ok(Some(Self::new(
+            instant,
+            locality_group,
+            std::ops::Bound::Included(range),
+        )))
     }
 
     pub fn get_range_start_from_prefix(
@@ -136,8 +141,8 @@ impl Iterator for &mut Reader {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.peek()? {
-            Err(e) => Some(Err(e)),
             Ok(_) => Some(Ok(self.buffer.pop_front().unwrap())),
+            Err(e) => Some(Err(e)),
         }
     }
 }
