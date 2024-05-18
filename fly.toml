@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for smoltable-1 on 2024-05-18T17:38:30+02:00
+# fly.toml app configuration file generated for smoltable-1-wild-fog-1306 on 2024-05-18T17:46:20+02:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'smoltable-1'
+app = 'smoltable-1-wild-fog-1306'
 primary_region = 'ams'
 kill_signal = 'SIGINT'
 kill_timeout = '5s'
