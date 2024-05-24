@@ -74,6 +74,7 @@ impl Writer {
 
     pub fn finalize(self) -> crate::Result<()> {
         self.batch.commit()?;
+        self.table.keyspace.persist(fjall::PersistMode::SyncAll)?;
         Ok(())
     }
 }

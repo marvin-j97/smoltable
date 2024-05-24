@@ -60,7 +60,7 @@ impl ManifestTable {
         self.tree
             .insert(format!("table#{table_name}#name"), table_name)?;
 
-        self.keyspace.persist(fjall::FlushMode::SyncAll)?;
+        self.keyspace.persist(fjall::PersistMode::SyncAll)?;
 
         Ok(())
     }

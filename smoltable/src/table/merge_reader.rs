@@ -46,7 +46,7 @@ impl Iterator for &mut MergeReader {
             .enumerate()
             .filter(|(_, cell)| Option::is_some(cell))
             .map(|(idx, cell)| (idx, cell.unwrap()))
-            .max_by(|(_, a), (_, b)| a.raw_key.cmp(&b.raw_key));
+            .min_by(|(_, a), (_, b)| a.raw_key.cmp(&b.raw_key));
 
         let Some((lowest_idx, _)) = lowest_idx else {
             // No more items

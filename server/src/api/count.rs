@@ -9,11 +9,13 @@ use actix_web::{
     HttpResponse,
 };
 use serde_json::json;
+use smoltable::query::count::Input as CountInput;
 
 #[post("/v1/table/{name}/count")]
 pub async fn handler(
     path: Path<String>,
     app_state: web::Data<AppState>,
+    req_body: web::Json<CountInput>,
 ) -> CustomRouteResult<HttpResponse> {
     let before = std::time::Instant::now();
 
@@ -40,10 +42,10 @@ pub async fn handler(
     let tables = app_state.tables.read().await;
 
     if let Some(table) = tables.get(&table_name) {
-        let (row_count, cell_count) = {
+        let result = {
             let table = table.clone();
 
-            tokio::task::spawn_blocking(move || table.count())
+            tokio::task::spawn_blocking(move || table.scan_count(req_body.0))
                 .await
                 .expect("should join")
         }?;
@@ -52,10 +54,10 @@ pub async fn handler(
 
         let micros_total = dur.as_micros();
 
-        let micros_per_row = if row_count == 0 {
+        let micros_per_row = if result.row_count == 0 {
             None
         } else {
-            Some(micros_total / row_count as u128)
+            Some(micros_total / result.row_count as u128)
         };
 
         Ok(build_response(
@@ -63,10 +65,11 @@ pub async fn handler(
             StatusCode::OK,
             "Count successful",
             &json!({
-                "row_count": row_count,
-                "cell_count": cell_count,
+                "row_count": result.row_count,
+                "cell_count": result.cell_count,
                 "micros": micros_total,
                 "micros_per_row": micros_per_row,
+                "bytes_scanned": result.bytes_scanned_count,
             }),
         ))
     } else {

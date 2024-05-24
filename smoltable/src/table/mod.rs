@@ -6,6 +6,7 @@ pub mod writer;
 use self::row_reader::SingleRowReader;
 use crate::{
     query::{
+        count::{Input as CountInput, Output as CountOutput},
         row::{
             ColumnOptions as QueryRowColumnOptions, Input as QueryRowInput,
             Output as QueryRowOutput, RowOptions as QueryRowInputRowOptions,
@@ -288,7 +289,7 @@ impl Smoltable {
         }
 
         batch.commit()?;
-        self.keyspace.persist(fjall::FlushMode::SyncAll)?;
+        self.keyspace.persist(fjall::PersistMode::SyncAll)?;
 
         self.load_locality_groups()?;
 
@@ -355,6 +356,98 @@ impl Smoltable {
         }
 
         Ok((row_count, cell_count))
+    }
+
+    pub fn scan_count(&self, input: CountInput) -> crate::Result<CountOutput> {
+        use reader::Reader as TableReader;
+
+        let column_filter = &input.column.as_ref().and_then(|x| x.filter.clone());
+
+        let locality_groups_to_scan = get_affected_locality_groups(self, column_filter)?;
+        let instant = self.keyspace.instant();
+
+        let mut bytes_scanned_count: u64 = 0;
+        let mut cell_count = 0; // Cell count over all aggregated rows
+
+        let mut current_row_key: Option<String> = None;
+        let mut row_count = 0;
+
+        let affected_locality_groups = locality_groups_to_scan.len();
+
+        let readers = locality_groups_to_scan
+            .into_iter()
+            .map(|locality_group| match &input.row.scan {
+                ScanMode::Prefix(prefix) => {
+                    TableReader::from_prefix(instant, locality_group, prefix)
+                }
+                ScanMode::Range(range) => {
+                    TableReader::from_prefix(instant, locality_group, &range.start)
+                } // TODO: ScanMode::Ranges(ranges) => unimplemented!(),
+            })
+            .collect::<fjall::Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let mut reader = MergeReader::new(readers);
+
+        let mut should_be_terminated = false;
+
+        loop {
+            let Some(cell) = (&mut reader).next() else {
+                break;
+            };
+
+            let cell = cell?;
+
+            match &input.row.scan {
+                ScanMode::Prefix(prefix) => {
+                    if !cell.row_key.starts_with(prefix) {
+                        should_be_terminated = true;
+                        continue;
+                    }
+                }
+                ScanMode::Range(range) => {
+                    if range.inclusive {
+                        if cell.row_key > range.end {
+                            should_be_terminated = true;
+                            continue;
+                        }
+                    } else if cell.row_key >= range.end {
+                        should_be_terminated = true;
+                        continue;
+                    }
+                }
+            }
+
+            if let Some(filter) = column_filter {
+                if !cell.satisfies_column_filter(filter) {
+                    continue;
+                }
+            }
+
+            if current_row_key.is_none() || current_row_key.as_ref().unwrap() != &cell.row_key {
+                current_row_key = Some(cell.row_key);
+
+                // We are visiting a new row
+                row_count += 1;
+
+                if should_be_terminated {
+                    break;
+                }
+            }
+
+            cell_count += 1;
+        }
+
+        bytes_scanned_count += reader.bytes_scanned_count();
+
+        Ok(CountOutput {
+            affected_locality_groups,
+            cell_count: cell_count as u64,
+            row_count: row_count as u64,
+            bytes_scanned_count,
+        })
     }
 
     // TODO: GC thrashes block cache
@@ -587,6 +680,8 @@ impl Smoltable {
 
         let mut reader = MergeReader::new(readers);
 
+        let mut should_be_terminated = false;
+
         loop {
             // We are gonna visit another cell, if the global cell limit is reached
             // we can short circuit out of the loop
@@ -600,22 +695,22 @@ impl Smoltable {
 
             let cell = cell?;
 
-            // TODO: test with multiple partitions, can only break once ALL partitions have emitted row key that doesn't match scan mode
-            // TODO: Reader.stop() -> is_finished = true, short circuits next() to None?
-            // TODO: merge reader needs "stop predicate" or something...
             match &input.row.scan {
                 ScanMode::Prefix(prefix) => {
                     if !cell.row_key.starts_with(prefix) {
-                        break;
+                        should_be_terminated = true;
+                        continue;
                     }
                 }
                 ScanMode::Range(range) => {
                     if range.inclusive {
                         if cell.row_key > range.end {
-                            break;
+                            should_be_terminated = true;
+                            continue;
                         }
                     } else if cell.row_key >= range.end {
-                        break;
+                        should_be_terminated = true;
+                        continue;
                     }
                 }
             }
@@ -648,6 +743,10 @@ impl Smoltable {
                             row_sample_counter -= 1.0;
                         }
                     }
+                }
+
+                if should_be_terminated {
+                    break;
                 }
             }
 
